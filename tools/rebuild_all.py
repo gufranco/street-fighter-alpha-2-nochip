@@ -62,8 +62,11 @@ def assemble(
     """Stage one variant and assemble the bypass against it.
 
     The shelling out is a parameter so the staging and the naming can be driven
-    without the assembler on the machine.
+    without the assembler on the machine. The output directory is created here
+    rather than only in the caller, so a caller that starts with this step does
+    not fail on a checkout that has never been built.
     """
+    OUT.mkdir(parents=True, exist_ok=True)
     staged = OUT / f"{region}-{name}-cart.sfc"
     staged.write_bytes(cart)
     output = f"{region}-{name}-bypass.sfc"

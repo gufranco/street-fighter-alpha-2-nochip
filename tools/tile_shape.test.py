@@ -157,6 +157,7 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(tile_shape.main([]), 2)
 
 
+@NEEDS_A_DUMP  # pragma: no cover
 class ExhaustedTableTest(unittest.TestCase):
     """A survey that runs out of streams rather than stopping at a limit."""
 
