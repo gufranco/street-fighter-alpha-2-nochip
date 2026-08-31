@@ -4,7 +4,7 @@
     "siblings": "Nine members on the import path, each held to its own suite: mos65xx, sony-spc700, sony-s-smp, sony-s-dsp, snes-sdd1, snes-mapper, snes-rom-image, snes-graphics and snes-driver.",
     "cartridges": "The two retail images named in artifacts.manifest.json, each identified by four digests and neither carried here.",
     "requests": "1,661 chip requests recorded by driving the Japanese cartridge on a model, which is what the Japanese stream table was built from.",
-    "thirdParty": "Patches published by other people, treated as claims to be checked rather than as sources.",
+    "thirdParty": "Patches published by other people, treated as claims to be checked rather than as sources. The one examined here is identified below so a later reader can tell whether they have the same package rather than a different build of it. Neither the patch nor its source is carried.",
     "prototype": "A Capcom prototype of the Japanese cartridge dated 1996-09-15, which declares no coprocessor and stores uncompressed a large amount of what the retail cartridge compresses."
   },
   "divergences": [
@@ -80,5 +80,30 @@
       "wouldSettleIt": "Assembly from the author dated after 2021-06, or a reproduction of any of the three faults on a run this project can drive.",
       "namedInDocument": "A published patch is not evidence, including about itself"
     }
-  ]
+  ],
+  "thirdPartyExamined": {
+    "what": "An MSU-1 modification of Street Fighter Alpha 2, package dated 2022-10-21, carrying assembly dated 2021-03-08.",
+    "carried": false,
+    "patch": {
+      "bytes": 45469,
+      "crc32": "15235471",
+      "md5": "9c840bc8bccdc9acff92956535e0ad2e",
+      "sha1": "4f82ef0471d51a08b18d4a6cf406fcce72de74ac",
+      "sha256": "97a52a74b660a8c18d09632d1064a3a992a2f0fa4835d9f1d15e14f9419ed527"
+    },
+    "assembly": {
+      "files": 26,
+      "bytes": 112392,
+      "sha256": "1cc18f8beb88a42b69ef90c4e31ef4291795276d6251b56661b73048b6a607b8",
+      "note": "The concatenation of every .asm in the published source folder, in sorted order."
+    },
+    "whatWasTaken": "Nothing. Every finding about it is recorded as a divergence rather than as a change.",
+    "whatWasChecked": [
+      "Applied to the retail image: 493 records, 1,300 changed runs, 47,894 bytes.",
+      "Subtracting the 419 addresses its own assembly touches leaves 641 runs and 39,643 bytes unexplained.",
+      "It introduces 64 long calls into bank $C7 and 39 into bank $D2, whose mapping depends on the S-DD1 window this project removes.",
+      "Its shipped audio driver reads three ports per handshake; its published assembly describes two.",
+      "Its empty-subroutine work names two targets. This project already retires three, including one that package never found."
+    ]
+  }
 }
