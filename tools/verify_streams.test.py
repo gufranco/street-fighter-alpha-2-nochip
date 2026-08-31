@@ -104,7 +104,7 @@ class VerifyTest(unittest.TestCase):
         self.assertIn(f"{len(cases):5d}/{len(cases)}", said[-1])
 
     def test_a_case_the_reference_disagrees_on_is_carried_out(self) -> None:
-        first = list(verify_streams.SETS["jp"][1]())[0]
+        first = next(iter(verify_streams.SETS["jp"][1]()))
 
         _, mismatches, _ = self.run_on([first])
 
