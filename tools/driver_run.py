@@ -185,7 +185,7 @@ def run(ports, entry, payload, at):
     moment the payload ran out would lose the last two bytes and blame the
     driver. It stops when the loop comes back round instead.
     """
-    cpu = spc700.Spc700(ports, reset=False)
+    cpu = spc700.Cpu("spc700", ports)
     cpu.pc = entry
     cpu.y = 0
     cpu.p = False

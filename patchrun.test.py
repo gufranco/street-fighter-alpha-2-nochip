@@ -196,7 +196,7 @@ class ReferenceBuildTest(unittest.TestCase):
         memory.ram[patchrun.DMA_BASE + 3] = (source >> 8) & 0xFF
         memory.ram[patchrun.DMA_BASE + 4] = patchrun.WINDOW_BASE + (source >> 16)
 
-        cpu = patchrun.emu65816.Cpu(memory, step_limit=patchrun.STEP_LIMIT)
+        cpu = patchrun.emu65816.Cpu("65816", memory)
         cpu.s = patchrun.STACK_TOP
         cpu.m8 = True
         cpu.x8 = False

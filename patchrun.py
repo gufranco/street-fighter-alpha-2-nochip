@@ -75,7 +75,7 @@ def translate(memory, source, channel=0x00, entry=None, dmap=ARMED_DMAP, **regis
     memory.ram[base + 3] = (source >> 8) & 0xFF
     memory.ram[base + 4] = WINDOW_BASE + (source >> 16)
 
-    cpu = emu65816.Cpu(memory, step_limit=STEP_LIMIT)
+    cpu = emu65816.Cpu("65816", memory)
     cpu.emulation = False
     cpu.s = STACK_TOP
     cpu.m8 = True
@@ -84,7 +84,7 @@ def translate(memory, source, channel=0x00, entry=None, dmap=ARMED_DMAP, **regis
     for name, value in registers.items():
         setattr(cpu, name, value)
 
-    cpu.call(entry if entry is not None else ENTRY_POINTS[channel])
+    cpu.call(entry if entry is not None else ENTRY_POINTS[channel], limit=STEP_LIMIT)
 
     destination = memory.ram[base + 2] | (memory.ram[base + 3] << 8) | (memory.ram[base + 4] << 16)
     return Outcome(destination, memory.ram[base], cpu)

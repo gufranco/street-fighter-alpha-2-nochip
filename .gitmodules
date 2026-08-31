@@ -16,3 +16,12 @@
 [submodule "snes-rom-image-python"]
 	path = snes-rom-image-python
 	url = https://github.com/gufranco/snes-rom-image-python.git
+[submodule "sony-s-smp-python"]
+	path = sony-s-smp-python
+	url = https://github.com/gufranco/sony-s-smp-python.git
+[submodule "snes-graphics-python"]
+	path = snes-graphics-python
+	url = https://github.com/gufranco/snes-graphics-python.git
+[submodule "snes-driver-python"]
+	path = snes-driver-python
+	url = https://github.com/gufranco/snes-driver-python.git

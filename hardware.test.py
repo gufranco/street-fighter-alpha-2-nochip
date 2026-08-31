@@ -77,7 +77,7 @@ class ModelTest(unittest.TestCase):
     def test_the_audio_mixer_is_the_one_that_was_vendored(self):
         mixer = importlib.import_module("sdsp")
 
-        self.assertTrue(hasattr(mixer, "Sdsp"))
+        self.assertTrue(hasattr(mixer, "Chip"))
         self.assertEqual(mixer.VOICE_COUNT, 8)
 
     def test_the_image_handling_is_the_one_that_was_vendored(self):
