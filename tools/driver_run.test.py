@@ -32,6 +32,27 @@ rather than as passed. Everything that can be checked without one is checked
 without one, and is above.
 """
 
+
+def _unit_builds() -> bool:
+    try:
+        driver_run.ssmp.Chip("s-smp")
+    except Exception:
+        return False
+    return True
+
+
+NEEDS_THE_BOOT_ROM = unittest.skipUnless(
+    _unit_builds(),
+    "the audio unit needs Sony's boot program, which nobody may distribute",
+)
+"""The composed unit will not start without sixty four bytes Sony wrote.
+
+Those are an artifact like the cartridge is, so a machine without them skips the
+runs that need one rather than failing. This is asked by building a unit rather
+than by looking for a file, because where the model searches for it is the
+model's business and not this file's.
+"""
+
 JP = ROOT / "roms" / "sfz2-jp-final.sfc"
 
 PAYLOAD = bytes(range(0x30))
@@ -236,6 +257,7 @@ class StockTest(unittest.TestCase):
 
 
 @NEEDS_A_DUMP
+@NEEDS_THE_BOOT_ROM
 class ComposedTest(unittest.TestCase):
     """The same driver on the whole audio unit, which is a second witness.
 
@@ -342,6 +364,7 @@ class ComposedTest(unittest.TestCase):
         self.assertEqual(found.streams[0], payload[0::3])
 
 
+@NEEDS_THE_BOOT_ROM
 class ConsoleTest(unittest.TestCase):
     def build(self, payload):
         chip = driver_run.ssmp.Chip("s-smp")
@@ -406,6 +429,7 @@ class ConsoleTest(unittest.TestCase):
 
 class EntryTest(unittest.TestCase):
     @NEEDS_A_DUMP
+    @NEEDS_THE_BOOT_ROM
     def test_a_run_from_the_command_line_reports_what_it_measured(self) -> None:
         self.assertEqual(driver_run.main([str(USA)]), 0)
 
