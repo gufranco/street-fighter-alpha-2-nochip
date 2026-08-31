@@ -3,6 +3,7 @@ import re
 import subprocess
 import sys
 import textwrap
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -31,9 +32,14 @@ def load(name: str) -> Any:
     return module
 
 
-def assemble(region: str) -> Any:
+def assemble(region: str, execute: Callable[..., Any] = subprocess.run) -> Any:
+    """Build the patch source against one region's cartridge and read the result.
+
+    The shelling out is a parameter so the caller can be driven without the
+    assembler on the machine.
+    """
     output = f"probe-{region}.sfc"
-    subprocess.run(
+    execute(
         [sys.executable, "build.py", SOURCE, str(RETAIL[region].relative_to(ROOT)), output],
         cwd=ROOT,
         check=True,
@@ -154,13 +160,28 @@ def rewrite(
     )
 
 
-def main(argv: list[str]) -> int:
-    check_only = "--check" in argv[1:]
+def main(
+    argv: list[str],
+    build: Callable[[str], Any] = assemble,
+    read: Callable[[Path], Any] | None = None,
+    target: Path | None = None,
+    verify: Callable[[str], Any] = load,
+    say: Callable[..., None] = print,
+) -> int:
+    """Freeze what the assembler produced into a table, then prove they agree.
 
-    assembled = {region: assemble(region) for region in RETAIL}
+    Each collaborator is a parameter, so the decision the tool makes can be
+    driven without the assembler and without either cartridge. The decision is
+    the part worth testing: which runs are shared, whether the region specific
+    ones agree, and whether the table it writes reproduces the assembler.
+    """
+    check_only = "--check" in argv[1:]
+    read = dump.read if read is None else read
+    target = ROOT / "spcfast.py" if target is None else target
+
+    assembled = {region: build(region) for region in RETAIL}
     runs = {
-        region: differing_runs(dump.read(RETAIL[region]), image)
-        for region, image in assembled.items()
+        region: differing_runs(read(RETAIL[region]), image) for region, image in assembled.items()
     }
 
     shared = [run for run in runs["jp"] if run in runs["usa"]]
@@ -171,40 +192,38 @@ def main(argv: list[str]) -> int:
 
     counts = {region: len(extra) for region, extra in per_region.items()}
     if len(set(counts.values())) != 1 or max(counts.values()) > 1:
-        print(
-            f"  region specific runs must match and number at most one: {counts}", file=sys.stderr
-        )
+        say(f"  region specific runs must match and number at most one: {counts}", file=sys.stderr)
         return 1
 
-    source = (ROOT / "spcfast.py").read_text()
+    source = target.read_text()
     if max(counts.values()) == 0:
         updated = rewrite(source, shared, None, None)
     else:
         bodies = {region: extra[0][1] for region, extra in per_region.items()}
         if bodies["jp"] != bodies["usa"]:
-            print("  the region specific run must carry identical bytes", file=sys.stderr)
+            say("  the region specific run must carry identical bytes", file=sys.stderr)
             return 1
         sites = tuple(sorted(extra[0][0] for extra in per_region.values()))
         updated = rewrite(source, shared, bodies["jp"], sites)
 
     if not check_only:
-        (ROOT / "spcfast.py").write_text(updated)
+        target.write_text(updated)
 
-    spcfast = load("spcfast")
+    spcfast = verify("spcfast")
     for region, image in assembled.items():
-        if spcfast.apply(dump.read(RETAIL[region])) != image:
-            print(
+        if spcfast.apply(read(RETAIL[region])) != image:
+            say(
                 f"  {region}: spcfast.py does not reproduce what the assembler produces",
                 file=sys.stderr,
             )
             return 1
-        print(f"  {region}: the frozen table reproduces the assembler exactly")
+        say(f"  {region}: the frozen table reproduces the assembler exactly")
 
     runs_total = len(shared) + max(counts.values())
     byte_total = sum(len(data) for _, data in shared)
     if max(counts.values()):
         byte_total += len(per_region["jp"][0][1])
-    print(f"  {runs_total} runs, {byte_total} bytes")
+    say(f"  {runs_total} runs, {byte_total} bytes")
     return 0
 
 
