@@ -98,21 +98,37 @@ def scan_cost(entries: list[tuple[int, int]]) -> tuple[int, int]:
     return int(statistics.median(distances)), max(distances)
 
 
-def report(rom_path: str | Path) -> int:
-    rom = dump.read(Path(rom_path))
-    entries = load(table_for(rom_path))
+def report(
+    rom_path: str | Path,
+    say: Callable[[str], None] = print,
+    read: Callable[[Path], Any] | None = None,
+    entries: list[tuple[int, int]] | None = None,
+) -> int:
+    """Everything wrong with one cartridge's table, and whether that is a failure.
+
+    The stream, the cartridge reader and the table are parameters, so each
+    finding can be driven without a dump on the machine.
+
+    The scan is not measured when a source repeats, because two entries under
+    one key have no placement and the allocator raises rather than returning a
+    distance. The repeat already fails the run, and reporting it is worth more
+    than falling over on the way to the verdict.
+    """
+    read = dump.read if read is None else read
+    rom = read(Path(rom_path))
+    entries = load(table_for(rom_path)) if entries is None else entries
 
     repeated = duplicate_sources(entries)
     broken = undecodable(rom, entries)
-    median, worst = scan_cost(entries)
+    median, worst = (0, 0) if repeated else scan_cost(entries)
 
-    print(f"  streams        {len(entries):,}")
-    print(f"  duplicates     {len(repeated)}")
-    print(f"  undecodable    {len(broken)}")
-    print(f"  scan distance  median {median}, worst {worst} (budget {SCAN_BUDGET})")
+    say(f"  streams        {len(entries):,}")
+    say(f"  duplicates     {len(repeated)}")
+    say(f"  undecodable    {len(broken)}")
+    say(f"  scan distance  median {median}, worst {worst} (budget {SCAN_BUDGET})")
 
     failed = bool(repeated) or bool(broken) or worst > SCAN_BUDGET
-    print("  RESULT         " + ("FAIL" if failed else "OK"))
+    say("  RESULT         " + ("FAIL" if failed else "OK"))
     return 1 if failed else 0
 
 
@@ -120,13 +136,14 @@ def main(
     argv: list[str],
     say: Callable[[str], None] = print,
     complain: Callable[[str], None] | None = None,
+    examine: Callable[..., int] = report,
 ) -> int:
-    """The command line, with both streams passed in so a run can be checked."""
+    """The command line, with both streams and the check passed in."""
     complain = say if complain is None else complain
     if len(argv) != 2:
         complain("usage: mapcheck.py <rom>")
         return 2
-    return report(argv[1])
+    return examine(argv[1], say)
 
 
 if __name__ == "__main__":
