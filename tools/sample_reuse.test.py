@@ -17,7 +17,7 @@ def load_module(name: str, where: Path) -> Any:
 sample_reuse = load_module("sample_reuse", ROOT / "tools")
 
 
-def parse(*lines):
+def parse(*lines: str) -> list[Any]:
     return list(sample_reuse.loads(sample_reuse.events(list(lines))))
 
 
@@ -70,7 +70,7 @@ class SegmentTest(unittest.TestCase):
 
 
 class SpanTest(unittest.TestCase):
-    def walk(self):
+    def walk(self) -> list[Any]:
         return parse(
             LOAD.format(frame=1),
             WALK.format(frame=1, ids="05,06,00", alloc="1600"),
@@ -188,7 +188,7 @@ class ResidencyTest(unittest.TestCase):
 
 
 class BaseRepeatTest(unittest.TestCase):
-    def two_loads(self, second_source):
+    def two_loads(self, second_source: str) -> list[Any]:
         return parse(
             LOAD.format(frame=1),
             BLOCK.format(src="D1:A000", length=9, dest="1500"),

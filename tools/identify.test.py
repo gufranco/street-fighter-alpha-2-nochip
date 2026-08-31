@@ -4,8 +4,9 @@ import json
 import tempfile
 import unittest
 import zlib
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 MODULE_PATH = Path(__file__).resolve().parent / "identify.py"
 
@@ -25,7 +26,7 @@ OTHER = bytes(range(255, -1, -1)) * 4096
 CORRUPT = (b"\x00" * 1024) + RETAIL[1024:]
 
 
-def digest_of(data):
+def digest_of(data: bytes | bytearray) -> dict[str, Any]:
     return {
         "size": len(data),
         "crc32": f"{zlib.crc32(data) & 0xFFFFFFFF:08X}",
@@ -35,7 +36,7 @@ def digest_of(data):
     }
 
 
-def manifest_fixture():
+def manifest_fixture() -> dict[str, Any]:
     return {
         "canonical": {"form": "one file, no copier header"},
         "decides": "sha256",
@@ -69,7 +70,7 @@ def manifest_fixture():
     }
 
 
-def artifact_named(manifest, filename):
+def artifact_named(manifest: dict[str, Any], filename: str) -> dict[str, Any]:
     return next(a for a in manifest["artifacts"] if a["filename"] == filename)
 
 
@@ -90,13 +91,14 @@ class DigestTest(unittest.TestCase):
 
 
 class DiagnoseTest(unittest.TestCase):
+    @override
     def setUp(self) -> None:
         self.manifest = manifest_fixture()
         self.tmp = tempfile.TemporaryDirectory()
         self.roms = Path(self.tmp.name)
         self.addCleanup(self.tmp.cleanup)
 
-    def usa(self):
+    def usa(self) -> dict[str, Any]:
         return artifact_named(self.manifest, "dungeon-master-usa.sfc")
 
     def test_the_expected_dump_reads_as_ok(self) -> None:
@@ -166,13 +168,14 @@ class DiagnoseTest(unittest.TestCase):
 
 
 class ExplainTest(unittest.TestCase):
+    @override
     def setUp(self) -> None:
         self.manifest = manifest_fixture()
         self.tmp = tempfile.TemporaryDirectory()
         self.roms = Path(self.tmp.name)
         self.addCleanup(self.tmp.cleanup)
 
-    def mismatch(self):
+    def mismatch(self) -> Any:
         (self.roms / "dungeon-master-usa.sfc").write_bytes(RETAIL[:4096])
         return ident.diagnose(
             artifact_named(self.manifest, "dungeon-master-usa.sfc"), self.manifest, self.roms
@@ -205,6 +208,7 @@ class ExplainTest(unittest.TestCase):
 
 
 class RunTest(unittest.TestCase):
+    @override
     def setUp(self) -> None:
         self.manifest = manifest_fixture()
         self.tmp = tempfile.TemporaryDirectory()
@@ -224,6 +228,7 @@ class RunTest(unittest.TestCase):
 
 
 class ShippedManifestTest(unittest.TestCase):
+    @override
     def setUp(self) -> None:
         self.manifest = ident.read_manifest()
 
@@ -270,10 +275,12 @@ class ShippedManifestTest(unittest.TestCase):
 class EntryTest(unittest.TestCase):
     """A run from the command line, with the manifest passed in."""
 
-    def _manifest(self, artifacts):
+    def _manifest(self, artifacts: list[Any]) -> dict[str, Any]:
         return {"decides": "sha256", "artifacts": artifacts, "known_bad": [], "not_this": []}
 
-    def _artifact(self, filename="nothing-here.sfc", accepted=()):
+    def _artifact(
+        self, filename: str = "nothing-here.sfc", accepted: Sequence[Any] = ()
+    ) -> dict[str, Any]:
         return {
             "name": "Something",
             "filename": filename,
@@ -282,7 +289,7 @@ class EntryTest(unittest.TestCase):
         }
 
     def test_a_name_nothing_matches_is_reported_rather_than_passing(self) -> None:
-        complained = []
+        complained: list[Any] = []
 
         code = ident.main(
             ["identify.py", "nothing-at-all.sfc"],
@@ -295,7 +302,7 @@ class EntryTest(unittest.TestCase):
         self.assertIn("no artifact", complained[0])
 
     def test_a_dump_that_is_not_here_is_reported_and_fails(self) -> None:
-        said = []
+        said: list[Any] = []
 
         code = ident.main(
             ["identify.py"],
@@ -307,14 +314,14 @@ class EntryTest(unittest.TestCase):
         self.assertIn("missing", " ".join(said))
 
     def test_a_manifest_with_no_digests_yet_says_so(self) -> None:
-        said = []
+        said: list[Any] = []
 
         ident.main(["identify.py"], manifest=self._manifest([self._artifact()]), say=said.append)
 
         self.assertIn("no digest published", " ".join(said))
 
     def test_every_line_it_prints_names_the_file_it_is_about(self) -> None:
-        said = []
+        said: list[Any] = []
 
         ident.main(["identify.py"], manifest=self._manifest([self._artifact()]), say=said.append)
 
@@ -324,7 +331,7 @@ class EntryTest(unittest.TestCase):
 class HintTest(unittest.TestCase):
     """What to do about a dump that is here and wrong, which is the useful case."""
 
-    def _finding(self, state):
+    def _finding(self, state: str) -> Any:
         return ident.Finding("Something", "a.sfc", state, "", None, None)
 
     def test_a_file_of_the_wrong_size_suggests_a_copier_header_or_a_split_set(self) -> None:

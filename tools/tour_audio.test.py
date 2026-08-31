@@ -17,7 +17,7 @@ def load_module(name: str, where: Path) -> Any:
 tour = load_module("tour_audio", ROOT / "tools")
 
 
-def log(lines):
+def log(lines: list[str]) -> str:
     return "\n".join(lines) + "\n"
 
 

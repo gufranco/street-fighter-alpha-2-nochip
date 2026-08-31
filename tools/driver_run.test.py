@@ -162,7 +162,7 @@ class ImageTest(unittest.TestCase):
 class TransferTest(unittest.TestCase):
     """The patched receive loop, run rather than read."""
 
-    def deliver(self, payload, rom=USA):
+    def deliver(self, payload: bytes | bytearray, rom: Path = USA) -> Any:
         image = driver_run.image_of(spcfast.apply(bytearray(rom.read_bytes())))
         return driver_run.deliver(image, payload, driver_run.DESTINATION)
 
@@ -221,7 +221,7 @@ class TransferTest(unittest.TestCase):
 class StockTest(unittest.TestCase):
     """The driver before the patch, which is the thing the patch is faster than."""
 
-    def stock(self, payload, rom=USA):
+    def stock(self, payload: bytes | bytearray, rom: Path = USA) -> Any:
         image = driver_run.image_of(bytearray(rom.read_bytes()))
         return driver_run.deliver_one_at_a_time(image, payload, driver_run.DESTINATION)
 
@@ -266,11 +266,11 @@ class ComposedTest(unittest.TestCase):
     self-consistent. The unit was not written for this project at all.
     """
 
-    def images(self):
+    def images(self) -> tuple[bytes, bytes]:
         rom = bytearray(USA.read_bytes())
         return driver_run.image_of(rom), driver_run.image_of(spcfast.apply(bytearray(rom)))
 
-    def unit(self, payload=PAYLOAD):
+    def unit(self, payload: bytes | bytearray = PAYLOAD) -> Any:
         _stock, fast = self.images()
         return driver_run.on_hardware(fast, payload, driver_run.DESTINATION)
 
@@ -366,7 +366,7 @@ class ComposedTest(unittest.TestCase):
 
 @NEEDS_THE_BOOT_ROM
 class ConsoleTest(unittest.TestCase):
-    def build(self, payload):
+    def build(self, payload: bytes | bytearray) -> tuple[Any, Any]:
         chip = driver_run.ssmp.Chip("s-smp")
         chip.reset()
         chip.space.write8(driver_run.PORT_BASE, driver_run.UNECHOED)

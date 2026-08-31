@@ -3,7 +3,7 @@ import itertools
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -32,11 +32,13 @@ PATCHED = ROOT / "build" / "sfa2-usa-patched.sfc"
 TAGGED = ROOT / "roms" / "sfa2-usa-vc-sound-restored.sfc"
 
 
-def region(bank, start, end):
+def region(bank: int, start: int, end: int) -> Any:
     return rombuild.Region(bank=bank, start=start, end=end)
 
 
-def read_snes(image, address, length, banks=rombuild.IMAGE_BANKS):
+def read_snes(
+    image: bytes | bytearray, address: int, length: int, banks: int = rombuild.IMAGE_BANKS
+) -> bytes:
     out = bytearray()
     bank, addr = address >> 16, address & 0xFFFF
     while length:
@@ -107,7 +109,12 @@ class AllocationTest(unittest.TestCase):
 
 @unittest.skipUnless(PATCHED.exists() and TAGGED.exists(), "the patched rom is not built")
 class ImageTest(unittest.TestCase):
+    entries: ClassVar[Any]
+    result: ClassVar[Any]
+    rom: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.rom = dump.read(PATCHED)
         cls.entries = rombuild.load_entries(dump.read(TAGGED))
@@ -124,8 +131,8 @@ class ImageTest(unittest.TestCase):
 
             self.assertEqual(got, self.rom[bank * 0x8000 : bank * 0x8000 + 0x8000])
 
-    def occupied(self):
-        spans = {}
+    def occupied(self) -> dict[int, list[tuple[int, int]]]:
+        spans: dict[int, list[tuple[int, int]]] = {}
         for entry in self.entries:
             destination = self.result.destinations[entry.index]
             spans.setdefault(destination >> 16, []).append(
@@ -230,8 +237,11 @@ class ImageTest(unittest.TestCase):
         image = self.result.image
         banks = rombuild.IMAGE_BANKS
 
-        def table_byte(bank, index):
-            return image[mapper.address_to_file(bank, index, banks)]
+        def table_byte(bank: int, index: int) -> int:
+            at = mapper.address_to_file(bank, index, banks)
+            assert isinstance(at, int)
+            found: int = image[at]
+            return found
 
         for entry in self.entries[:200]:
             source_bank = 0xC0 + (entry.source >> 16)

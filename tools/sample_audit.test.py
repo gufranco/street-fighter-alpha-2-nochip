@@ -14,11 +14,11 @@ DIRECTORY = 0x1000
 FIRST = 0x1500
 
 
-def blank():
+def blank() -> bytearray:
     return bytearray(audit.APU_RAM)
 
 
-def put_directory(ram, index, start, loop):
+def put_directory(ram: bytearray, index: int, start: int, loop: int) -> None:
     at = DIRECTORY + index * 4
     ram[at] = start & 0xFF
     ram[at + 1] = start >> 8
@@ -26,13 +26,21 @@ def put_directory(ram, index, start, loop):
     ram[at + 3] = loop >> 8
 
 
-def put_block(ram, at, last=False, loop=False, level=0x0C, filter_index=0, nibble=0x77):
+def put_block(
+    ram: bytearray,
+    at: int,
+    last: bool = False,
+    loop: bool = False,
+    level: int = 0x0C,
+    filter_index: int = 0,
+    nibble: int = 0x77,
+) -> None:
     ram[at] = (level << 4) | (filter_index << 2) | (0x01 if last else 0) | (0x02 if loop else 0)
     for offset in range(1, 9):
         ram[at + offset] = nibble
 
 
-def put_sample(ram, index, at, blocks=3, loop=False):
+def put_sample(ram: bytearray, index: int, at: int, blocks: int = 3, loop: bool = False) -> None:
     put_directory(ram, index, at, at)
     for step in range(blocks):
         last = step == blocks - 1
@@ -266,7 +274,7 @@ class ReportTest(unittest.TestCase):
 
 
 class EntryPointTest(unittest.TestCase):
-    def image(self, ram):
+    def image(self, ram: bytearray) -> Path:
         where = Path(tempfile.mkdtemp()) / "apu.bin"
         where.write_bytes(bytes(ram))
         return where

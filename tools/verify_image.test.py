@@ -31,15 +31,15 @@ cannot hold it, so the fixture is the size the real one is.
 """
 
 
-def _image(banks=BANKS):
+def _image(banks: int = BANKS) -> bytearray:
     return bytearray(banks * mapper.BANK)
 
 
-def _write(image, banks, bank, address, value):
+def _write(image: bytearray, banks: int, bank: int, address: int, value: int) -> None:
     image[mapper.address_to_file(bank, address, banks)] = value
 
 
-def _entry(image, banks, slot, source, destination):
+def _entry(image: bytearray, banks: int, slot: int, source: int, destination: int) -> None:
     _write(image, banks, verify_image.TABLE_BANK, slot, verify_image.WINDOW_BASE + (source >> 16))
     _write(image, banks, verify_image.TABLE_BANK + 1, slot, destination & 0xFF)
     _write(image, banks, verify_image.TABLE_BANK + 2, slot, (destination >> 8) & 0xFF)

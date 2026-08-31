@@ -2,7 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -28,7 +28,7 @@ sdd1map = load_module("sdd1map")
 TAGGED = ROOT / "roms" / "sfa2-usa-vc-sound-restored.sfc"
 
 
-def entry(index, source, target, length):
+def entry(index: int, source: int, target: int | None, length: int | None) -> Any:
     return sdd1map.Entry(index=index, source=source, target=target, length=length)
 
 
@@ -110,7 +110,10 @@ class BuildTest(unittest.TestCase):
 
 @unittest.skipUnless(TAGGED.exists(), "the tagged rom is not present")
 class RealMapTest(unittest.TestCase):
+    entries: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.entries = [e for e in sdd1map.build_map(dump.read(TAGGED)) if e.length]
 

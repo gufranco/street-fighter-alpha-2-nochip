@@ -24,7 +24,7 @@ USA = ROOT / "roms" / "sfa2-usa-final.sfc"
 JP = ROOT / "roms" / "sfz2-jp-final.sfc"
 
 
-def retail(path):
+def retail(path: Path) -> bytes:
     if not path.exists():
         raise unittest.SkipTest(f"{path} is not present")
     return path.read_bytes()
@@ -158,7 +158,7 @@ class ApplyTest(unittest.TestCase):
 
         patched = prefight.apply(rom)
 
-        allowed = set()
+        allowed: set[int] = set()
         for at in prefight.find_callers(rom):
             allowed.update(range(at, at + 4))
         allowed.update(range(prefight.FILLER_FILE, prefight.FILLER_FILE + len(prefight.routine())))

@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -30,14 +31,15 @@ USA = ROOT / "roms" / "sfa2-usa-final.sfc"
 JP = ROOT / "roms" / "sfz2-jp-final.sfc"
 
 
-def retail(path):
+def retail(path: Path) -> bytes:
     if not path.exists():
         raise unittest.SkipTest(f"{path} is not present")
     return path.read_bytes()
 
 
-def carrier(fix, filler=b"\x00" * 64):
-    return filler + fix.stock + filler
+def carrier(fix: Any, filler: bytes = b"\x00" * 64) -> bytes:
+    made: bytes = filler + fix.stock + filler
+    return made
 
 
 class TableTest(unittest.TestCase):
@@ -109,7 +111,7 @@ class ApplyTest(unittest.TestCase):
 
 
 class EmptyCallTest(unittest.TestCase):
-    def rom_with(self, call, sites, filler=b"\x00" * 32):
+    def rom_with(self, call: Any, sites: Sequence[int], filler: bytes = b"\x00" * 32) -> bytes:
         rom = bytearray(b"\x00" * 0x400000)
         rom[gamefixes.long_to_file(call.target)] = gamefixes.RTL
         run = gamefixes.call_run(call.target)
@@ -206,7 +208,7 @@ class RetailTest(unittest.TestCase):
             else:
                 self.assertIn(found[fix.name], ("already", "absent"), fix.name)
 
-    def outside_the_checksum(self, rom, patched):
+    def outside_the_checksum(self, rom: bytes | bytearray, patched: bytes | bytearray) -> int:
         field = range(spcfast.CHECKSUM_FIELD, spcfast.CHECKSUM_FIELD + 4)
         return sum(
             1
@@ -266,7 +268,7 @@ class RetailTest(unittest.TestCase):
 
         self.assertEqual(len(plates), 4)
 
-    def occurrences(self, rom, run):
+    def occurrences(self, rom: bytes | bytearray, run: bytes) -> int:
         found, at = 0, rom.find(run)
         while at != -1:
             found += 1
@@ -365,7 +367,7 @@ class RetailTest(unittest.TestCase):
     def test_the_reorder_puts_the_taunt_first_and_drops_the_dead_entry(self) -> None:
         fix = next(f for f in gamefixes.FIXES if f.name == "akuma win pose order")
 
-        def words(run):
+        def words(run: bytes) -> list[int]:
             return [run[i] | (run[i + 1] << 8) for i in range(0, len(run), 2)]
 
         self.assertEqual(words(fix.stock), [0x390, 0x39E, 0x3C4, 0x3DA])
@@ -382,7 +384,7 @@ class RetailTest(unittest.TestCase):
         order = next(f for f in gamefixes.FIXES if f.name == "akuma win pose order")
         index = next(f for f in gamefixes.FIXES if f.name == "akuma silent win pose index")
 
-        def words(run):
+        def words(run: bytes) -> list[int]:
             return [run[i] | (run[i + 1] << 8) for i in range(0, len(run), 2)]
 
         silent = 0x39E
@@ -424,14 +426,14 @@ class RetailTest(unittest.TestCase):
 class EntryTest(unittest.TestCase):
     """The command line, run with both streams collected rather than printed."""
 
-    def _paths(self):
+    def _paths(self) -> tuple[Path, Path]:
         where = Path(tempfile.mkdtemp())
         source = where / "in.sfc"
         source.write_bytes(USA.read_bytes())
         return source, where / "out.sfc"
 
     def test_too_few_arguments_are_refused_with_the_usage(self) -> None:
-        complained = []
+        complained: list[Any] = []
 
         code = gamefixes.main(["gamefixes.py"], say=lambda _l: None, complain=complained.append)
 
@@ -441,7 +443,7 @@ class EntryTest(unittest.TestCase):
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
     def test_patching_the_source_in_place_is_refused(self) -> None:
         source, _ = self._paths()
-        complained = []
+        complained: list[Any] = []
 
         code = gamefixes.main(
             ["gamefixes.py", str(source), str(source)],
@@ -455,7 +457,7 @@ class EntryTest(unittest.TestCase):
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
     def test_a_run_writes_the_patched_image_and_says_what_it_did(self) -> None:
         source, output = self._paths()
-        said = []
+        said: list[Any] = []
 
         code = gamefixes.main(["gamefixes.py", str(source), str(output)], say=said.append)
 

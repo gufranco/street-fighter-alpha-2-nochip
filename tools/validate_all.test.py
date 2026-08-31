@@ -39,7 +39,7 @@ class BurstTest(unittest.TestCase):
 
 
 class SummariseTest(unittest.TestCase):
-    def _log(self, folder, text):
+    def _log(self, folder: Path | str, text: str) -> Path:
         path = Path(folder) / "run.txt"
         path.write_text(text)
         return path

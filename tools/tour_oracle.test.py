@@ -21,7 +21,7 @@ tour_oracle = load_module("tour_oracle", ROOT / "tools" / "tour_oracle.py")
 BASE = tour_oracle.WINDOW_BASE
 
 
-def _dma(bank, address, count, channel=0, fixed=1):
+def _dma(bank: int, address: int, count: int, channel: int = 0, fixed: int = 1) -> str:
     return f"DMA ch={channel} src={bank:02X}:{address:04X} n={count} b=80 fixed={fixed}"
 
 

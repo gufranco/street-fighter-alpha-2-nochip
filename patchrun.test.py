@@ -2,7 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -38,7 +38,13 @@ TAGGED = ROOT / "roms" / "sfa2-usa-vc-sound-restored.sfc"
     "the built image is not present",
 )
 class TranslationTest(unittest.TestCase):
+    entries: ClassVar[Any]
+    expected: ClassVar[Any]
+    image: ClassVar[Any]
+    memory: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.image = dump.read(IMAGE)
         cls.entries = rombuild.load_entries(dump.read(TAGGED))
@@ -46,7 +52,7 @@ class TranslationTest(unittest.TestCase):
         cls.memory = patchrun.SnesMemory(cls.image)
 
     def test_every_stream_translates_to_its_allocated_address(self) -> None:
-        wrong = []
+        wrong: list[Any] = []
         for entry in self.entries:
             outcome = patchrun.translate(self.memory, entry.source)
 
@@ -187,11 +193,14 @@ class ReferenceBuildTest(unittest.TestCase):
     through the same interpreter and address model this project uses. It is the
     closest available check that the mapping is right, short of the SF7."""
 
+    image: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.image = dump.read(STAR_OCEAN)
 
-    def run_reference(self, source):
+    def run_reference(self, source: int) -> Any:
         memory = patchrun.SnesMemory(self.image, banks=STAR_OCEAN_BANKS)
         memory.ram[patchrun.DMA_BASE] = patchrun.ARMED_DMAP
         memory.ram[patchrun.DMA_BASE + 2] = source & 0xFF
@@ -230,7 +239,7 @@ class ReferenceBuildTest(unittest.TestCase):
 
 class EntryTest(unittest.TestCase):
     def test_too_few_arguments_are_refused_with_the_usage(self) -> None:
-        complained = []
+        complained: list[Any] = []
 
         code = patchrun.main(["patchrun.py"], say=lambda _l: None, complain=complained.append)
 
@@ -242,7 +251,7 @@ class EntryTest(unittest.TestCase):
         "the built image is not present",
     )
     def test_a_whole_run_reports_how_many_streams_it_executed(self) -> None:
-        said = []
+        said: list[Any] = []
 
         code = patchrun.main(
             ["patchrun.py", str(IMAGE), str(PATCHED), str(TAGGED)], say=said.append

@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -9,11 +10,18 @@ import doctor
 import hardware
 
 
+def _never_asked(_name: str) -> Any:
+    """Handed to a walk that must not reach a load, so reaching one is a failure."""
+    raise AssertionError("nothing should have been loaded")
+
+
 class Complaint(Exception):
     pass
 
 
-def a_finding(name="something", ok=True, detail="detail", advice=None):
+def a_finding(
+    name: str = "something", ok: bool = True, detail: str = "detail", advice: str | None = None
+) -> Any:
     return doctor.Finding(name, ok, detail, advice)
 
 
@@ -72,10 +80,10 @@ class ModelTest(unittest.TestCase):
         found = doctor._model("mos65xx", Path("/nowhere/at/all"), lambda _name: None)
 
         self.assertFalse(found.ok)
-        self.assertIn("submodule", found.advice)
+        self.assertIn("submodule", found.advice or "")
 
     def test_a_model_that_will_not_import_is_reported_as_what_it_threw(self) -> None:
-        def boom(_name):
+        def boom(_name: str) -> Any:
             raise Complaint("the model exploded")
 
         where = Path(tempfile.mkdtemp())
@@ -110,7 +118,7 @@ class DecompressorTest(unittest.TestCase):
         self.assertIn("8 bytes", found.detail)
 
     def test_one_that_throws_is_reported_rather_than_swallowed(self) -> None:
-        def boom():
+        def boom() -> Any:
             raise Complaint("nothing decodes")
 
         found = doctor._decompressor(boom)
@@ -132,7 +140,7 @@ class ToolTest(unittest.TestCase):
 
         self.assertFalse(found[0].ok)
         self.assertIn("not on the path", found[0].detail)
-        self.assertIn("does not need it", found[0].advice)
+        self.assertIn("does not need it", found[0].advice or "")
 
     def test_every_tool_a_build_shells_out_to_is_reported(self) -> None:
         names = [one.name for one in doctor.examine()]
@@ -182,7 +190,7 @@ class CartridgeTest(unittest.TestCase):
         self.assertIn("not there", found[0].detail)
 
     def test_a_check_that_throws_is_reported_rather_than_swallowed(self) -> None:
-        def boom():
+        def boom() -> Any:
             raise Complaint("no manifest at all")
 
         found = doctor._cartridges(boom)
@@ -195,7 +203,7 @@ class BeneathTest(unittest.TestCase):
     """That what this is built on is examined too, and under its own name."""
 
     def test_the_models_that_carry_a_doctor_are_asked_for_theirs(self) -> None:
-        def beneath():
+        def beneath() -> list[Any]:
             return [("snes-sdd1-python", doctor.Finding("python", True, "some version"))]
 
         for one in doctor.examine(beneath=beneath):
@@ -203,7 +211,7 @@ class BeneathTest(unittest.TestCase):
                 self.assertIn("/", one.name)
 
     def test_a_model_that_cannot_be_asked_is_reported_like_an_absent_one(self) -> None:
-        def beneath():
+        def beneath() -> list[Any]:
             raise Complaint("no doctor down there")
 
         found = doctor.examine(beneath=beneath)
@@ -213,7 +221,7 @@ class BeneathTest(unittest.TestCase):
         self.assertIn("Complaint", text)
 
     def test_an_unwell_finding_beneath_makes_this_run_unwell_too(self) -> None:
-        def beneath():
+        def beneath() -> list[Any]:
             return [("snes-sdd1-python", doctor.Finding("something", False, "not well", "look"))]
 
         self.assertTrue(any(not one.ok for one in doctor.examine(beneath=beneath)))
@@ -227,16 +235,16 @@ class BeneathTest(unittest.TestCase):
 class AskingEachTest(unittest.TestCase):
     """Which models get asked for a report, and which are passed over."""
 
-    def _a_doctor(self, findings):
+    def _a_doctor(self, findings: list[Any]) -> Any:
         return type("Underneath", (), {"examine": staticmethod(lambda: findings)})
 
     def test_a_model_that_is_not_checked_out_is_passed_over(self) -> None:
-        found = doctor._ask_each(["nothing"], lambda _name: "/nowhere/at/all", None)
+        found = doctor._ask_each(["nothing"], lambda _name: Path("/nowhere/at/all"), _never_asked)
 
         self.assertEqual(found, [])
 
     def test_a_model_with_no_doctor_is_passed_over_too(self) -> None:
-        def absent(_name):
+        def absent(_name: str) -> Any:
             raise ModuleNotFoundError("no doctor there")
 
         found = doctor._ask_each(["mos65xx"], hardware.root_of, absent)
@@ -244,7 +252,7 @@ class AskingEachTest(unittest.TestCase):
         self.assertEqual(found, [])
 
     def test_a_model_whose_doctor_will_not_run_is_left_to_raise(self) -> None:
-        def broken(_name):
+        def broken(_name: str) -> Any:
             raise Complaint("the doctor there exploded")
 
         with self.assertRaises(Complaint):
@@ -297,14 +305,14 @@ class EntryTest(unittest.TestCase):
         )
 
     def test_the_report_is_printed_rather_than_kept(self) -> None:
-        said = []
+        said: list[Any] = []
 
         doctor.main([], examine=lambda **_: [a_finding(ok=True)], say=said.append)
 
         self.assertTrue(said)
 
     def test_a_real_run_says_something_about_this_machine(self) -> None:
-        said = []
+        said: list[Any] = []
 
         doctor.main([], say=said.append)
 

@@ -46,6 +46,15 @@ jobs:
       - name: Check formatting
         run: ruff format --check .
 
+      - name: Install mypy
+        run: pipx install mypy==1.14.1
+
+      # Strict, with every optional error class the checker offers. The
+      # configuration lives in pyproject.toml so this run and a local one are
+      # the same run.
+      - name: Check types
+        run: mypy
+
       - name: Lint the workflows
         uses: raven-actions/actionlint@v2
 

@@ -3,7 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -75,7 +75,7 @@ class FindGateTest(unittest.TestCase):
 
 
 class ApplyTest(unittest.TestCase):
-    def make_rom(self):
+    def make_rom(self) -> bytes:
         rom = bytearray(0x20000)
         rom[0x00EC6E : 0x00EC6E + len(shinakuma.GATE)] = shinakuma.GATE
         return bytes(rom)
@@ -163,7 +163,11 @@ class DisassemblyTest(unittest.TestCase):
 
 @unittest.skipUnless(USA.exists() and JP.exists(), "the retail ROMs are not present")
 class RetailRomTest(unittest.TestCase):
+    jp: ClassVar[Any]
+    usa: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.usa = dump.read(USA)
         cls.jp = dump.read(JP)
@@ -249,7 +253,7 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(third.read_bytes(), output.read_bytes())
 
     def test_too_few_arguments_are_refused_with_the_usage(self) -> None:
-        complained = []
+        complained: list[Any] = []
 
         code = shinakuma.main(["shinakuma.py"], say=lambda _l: None, complain=complained.append)
 
@@ -259,7 +263,7 @@ class EntryTest(unittest.TestCase):
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
     def test_patching_the_source_in_place_is_refused(self) -> None:
         source, _ = self._paths()
-        complained = []
+        complained: list[Any] = []
 
         code = shinakuma.main(
             ["shinakuma.py", str(source), str(source)],
@@ -273,7 +277,7 @@ class EntryTest(unittest.TestCase):
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
     def test_a_run_writes_the_patched_image_and_says_what_it_did(self) -> None:
         source, output = self._paths()
-        said = []
+        said: list[Any] = []
 
         code = shinakuma.main(["shinakuma.py", str(source), str(output)], say=said.append)
 

@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -53,6 +54,7 @@ class LoadTest(unittest.TestCase):
 
 
 class ModelTest(unittest.TestCase):
+    @override
     def setUp(self) -> None:
         hardware.install()
 

@@ -22,7 +22,7 @@ USA = ROOT / "roms" / "sfa2-usa-final.sfc"
 JP = ROOT / "roms" / "sfz2-jp-final.sfc"
 
 
-def retail(path):
+def retail(path: Path) -> bytes:
     if not path.exists():
         raise unittest.SkipTest(f"{path} is not present")
     return path.read_bytes()
@@ -193,14 +193,14 @@ class RefusalTest(unittest.TestCase):
 class EntryTest(unittest.TestCase):
     """The command line, run with both streams collected rather than printed."""
 
-    def _paths(self):
+    def _paths(self) -> tuple[Path, Path]:
         where = Path(tempfile.mkdtemp())
         source = where / "in.sfc"
         source.write_bytes(USA.read_bytes())
         return source, where / "out.sfc"
 
     def test_too_few_arguments_are_refused_with_the_usage(self) -> None:
-        complained = []
+        complained: list[Any] = []
 
         code = repeatload.main(["repeatload.py"], say=lambda _l: None, complain=complained.append)
 
@@ -210,7 +210,7 @@ class EntryTest(unittest.TestCase):
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
     def test_patching_the_source_in_place_is_refused(self) -> None:
         source, _ = self._paths()
-        complained = []
+        complained: list[Any] = []
 
         code = repeatload.main(
             ["repeatload.py", str(source), str(source)],
@@ -224,7 +224,7 @@ class EntryTest(unittest.TestCase):
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
     def test_a_run_writes_the_patched_image_and_says_what_it_did(self) -> None:
         source, output = self._paths()
-        said = []
+        said: list[Any] = []
 
         code = repeatload.main(["repeatload.py", str(source), str(output)], say=said.append)
 

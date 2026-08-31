@@ -59,7 +59,7 @@ SKIPPED = "\n".join(
 )
 
 
-def _log(folder, text, name="run.txt"):
+def _log(folder: Path | str, text: str, name: str = "run.txt") -> Path:
     path = Path(folder) / name
     path.write_text(text)
     return path
@@ -129,8 +129,9 @@ class ReadTest(unittest.TestCase):
 
 
 class UploadTest(unittest.TestCase):
-    def _read(self, folder, text, name):
-        return compare_audio.read(_log(folder, text, name))
+    def _read(self, folder: Path | str, text: str, name: str) -> dict[str, Any]:
+        found: dict[str, Any] = compare_audio.read(_log(folder, text, name))
+        return found
 
     def test_a_source_uploaded_twice_is_counted_twice(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
@@ -179,8 +180,9 @@ class CostTest(unittest.TestCase):
 
 
 class VerdictTest(unittest.TestCase):
-    def _read(self, folder, text, name):
-        return compare_audio.read(_log(folder, text, name))
+    def _read(self, folder: Path | str, text: str, name: str) -> dict[str, Any]:
+        found: dict[str, Any] = compare_audio.read(_log(folder, text, name))
+        return found
 
     def test_a_faster_build_that_delivered_everything_passes(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
@@ -215,7 +217,7 @@ class VerdictTest(unittest.TestCase):
 
 
 class ReportTest(unittest.TestCase):
-    def _said(self, stock_text, patched_text):
+    def _said(self, stock_text: str, patched_text: str) -> str:
         with tempfile.TemporaryDirectory() as folder:
             stock = compare_audio.read(_log(folder, stock_text, "a.txt"))
             patched = compare_audio.read(_log(folder, patched_text, "b.txt"))

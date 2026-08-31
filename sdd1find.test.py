@@ -3,7 +3,7 @@ import random
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -76,12 +76,16 @@ class EntropyTest(unittest.TestCase):
 
 @unittest.skipUnless(ALPHA2.exists(), "the alpha 2 rom is not present")
 class FindStreamsTest(unittest.TestCase):
+    output: ClassVar[Any]
+    rom: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.rom = dump.read(ALPHA2)
         cls.output = sdd1.decompress(cls.rom, KNOWN_STREAM, KNOWN_LENGTH).data
 
-    def build_reference(self, seed=1):
+    def build_reference(self, seed: int = 1) -> Any:
         rng = random.Random(seed)
         noise = bytes(rng.randrange(256) for _ in range(4096))
         return noise + self.output + noise

@@ -3,7 +3,7 @@ import itertools
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -33,7 +33,7 @@ EXPECTED_GFX_BYTES = 4947202
 FIRST_SOURCE = 0x7890
 
 
-def tagged_blob(markers, size=8192):
+def tagged_blob(markers: list[tuple[int, int]], size: int = 8192) -> bytes:
     blob = bytearray(size)
     for position, target in markers:
         blob[position : position + 4] = sdd1map.MARKER
@@ -97,7 +97,12 @@ class BuildMapTest(unittest.TestCase):
 
 @unittest.skipUnless(TAGGED.exists() and RETAIL.exists(), "roms are not present")
 class RealMapTest(unittest.TestCase):
+    entries: ClassVar[Any]
+    retail: ClassVar[Any]
+    tagged: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.tagged = dump.read(TAGGED)
         cls.retail = dump.read(RETAIL)

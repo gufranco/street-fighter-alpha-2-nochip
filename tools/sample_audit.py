@@ -32,6 +32,7 @@ prove the checks without needing a cartridge.
 """
 
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, override
 
@@ -191,7 +192,7 @@ def reaches_end(ram: bytearray, directory: int, sample: int, samples: int = REND
     return bool(chip.read(REG_ENDX) & 0x01)
 
 
-def faults(ram: bytearray, directory: int, used: list[int]) -> list[Fault]:
+def faults(ram: bytearray, directory: int, used: Sequence[int]) -> list[Fault]:
     """Everything wrong with the samples that are actually in use."""
     found = []
     for sample in used:
@@ -207,7 +208,7 @@ def faults(ram: bytearray, directory: int, used: list[int]) -> list[Fault]:
     return found
 
 
-def overlaps(ram: bytearray, directory: int, used: list[int]) -> list[tuple[int, int, int]]:
+def overlaps(ram: bytearray, directory: int, used: Sequence[int]) -> list[tuple[int, int, int]]:
     """Pairs of different samples that share bytes, which one upload can damage."""
     reached: dict[int, tuple[int, set[int]]] = {}
     for sample in used:
@@ -229,7 +230,7 @@ def overlaps(ram: bytearray, directory: int, used: list[int]) -> list[tuple[int,
 
 
 def collisions(
-    ram: bytearray, directory: int, playing: list[int], written: list[int]
+    ram: bytearray, directory: int, playing: Sequence[int], written: Sequence[int]
 ) -> list[Fault]:
     """Which playing samples an upload would walk through while they are playing."""
     touched = set(written)
@@ -247,7 +248,7 @@ def collisions(
     return found
 
 
-def report(ram: bytearray, directory: int, used: list[int]) -> list[str]:
+def report(ram: bytearray, directory: int, used: Sequence[int]) -> list[str]:
     """Everything this can say about a bank, as lines a person reads."""
     lines = []
     for fault in faults(ram, directory, used):

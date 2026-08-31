@@ -22,7 +22,7 @@ BUDGET = harvest_jp.SCAN_BUDGET
 BASE = harvest_jp.WINDOW_BASE
 
 
-def _scan(address, channels):
+def _scan(address: int, channels: Any) -> str:
     parts = " ".join(
         f"ch{name}={bank:02X}:{addr:04X}:{count}:fixed1"
         for name, (bank, addr, count) in zip((0, 1, 7), channels, strict=True)
@@ -30,7 +30,7 @@ def _scan(address, channels):
     return f"SCAN addr={address:04X} {parts}"
 
 
-def _scanlen(address, steps):
+def _scanlen(address: int, steps: int) -> str:
     return f"SCANLEN addr={address:04X} steps={steps}"
 
 

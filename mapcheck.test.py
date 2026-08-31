@@ -2,7 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -76,7 +76,11 @@ class ScanCostTest(unittest.TestCase):
 
 @unittest.skipUnless(JP_ROM.exists(), "the Japanese ROM is absent")
 class JapaneseMapTest(unittest.TestCase):
+    entries: ClassVar[Any]
+    rom: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.rom = dump.read(JP_ROM)
         cls.entries = mapcheck.load()

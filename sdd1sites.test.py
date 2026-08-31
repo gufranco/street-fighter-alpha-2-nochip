@@ -2,7 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -83,7 +83,12 @@ class RegisterScanTest(unittest.TestCase):
 
 @unittest.skipUnless(RETAIL.exists() and TAGGED.exists(), "roms are not present")
 class RealRomTest(unittest.TestCase):
+    found: ClassVar[Any]
+    mask: ClassVar[Any]
+    rom: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.rom = dump.read(RETAIL)
         entries = sdd1map.build_map(dump.read(TAGGED))

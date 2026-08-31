@@ -2,7 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -35,7 +35,11 @@ class MatrixTest(unittest.TestCase):
 
 @unittest.skipUnless(RETAIL.exists(), "the retail cartridge is not present")
 class VariantTest(unittest.TestCase):
+    retail: ClassVar[Any]
+    variants: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.retail = dump.read(RETAIL)
         cls.variants = rebuild_all.variants(cls.retail)
@@ -57,7 +61,7 @@ class VariantTest(unittest.TestCase):
             self.assertNotEqual(image, self.retail, name)
 
     def test_no_two_variants_are_the_same_image(self) -> None:
-        seen = {}
+        seen: dict[Any, Any] = {}
         for name, image in self.variants.items():
             self.assertNotIn(image, seen.values(), name)
             seen[name] = image

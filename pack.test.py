@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -68,7 +69,7 @@ class ManifestTest(unittest.TestCase):
 
 class AssemblyFailureTest(unittest.TestCase):
     @staticmethod
-    def result(returncode=1, stdout="", stderr=""):
+    def result(returncode: int = 1, stdout: str = "", stderr: str = "") -> Any:
         return subprocess.CompletedProcess(
             args=["python3", "build.py"], returncode=returncode, stdout=stdout, stderr=stderr
         )
@@ -109,7 +110,7 @@ class LoadingTest(unittest.TestCase):
         self.assertTrue(hasattr(pack.load_images(), "dump"))
 
     def test_a_tree_without_it_stops_with_what_the_loader_said(self) -> None:
-        def absent(_name):
+        def absent(_name: str) -> Any:
             raise pack.hardware.ModelMissing("run git submodule update")
 
         with self.assertRaises(SystemExit) as raised:
@@ -140,7 +141,7 @@ class AssembleTest(unittest.TestCase):
         self.assertIn("build.py", found)
         self.assertIn("usa-bypass.sfc", found)
 
-    def _under_root(self):
+    def _under_root(self) -> Path:
         where = Path(tempfile.mkdtemp(dir=pack.ROOT))
         self.addCleanup(shutil.rmtree, where, True)
         return where
@@ -173,7 +174,7 @@ class AssembleTest(unittest.TestCase):
 
 
 @contextlib.contextmanager
-def a_dump_in_place(region="usa"):
+def a_dump_in_place(region: str = "usa") -> Iterator[Path]:
     """Point a region at a file that exists, so the presence check lets a run through.
 
     These cases drive `pack.main` past the point where it looks for the dump, and
@@ -197,7 +198,7 @@ class EntryTest(unittest.TestCase):
     """A run from the command line, with the slow steps passed in."""
 
     def test_a_region_nobody_knows_is_refused(self) -> None:
-        complained = []
+        complained: list[Any] = []
 
         code = pack.main(["pack.py", "mars"], say=lambda _l: None, complain=complained.append)
 
@@ -205,7 +206,7 @@ class EntryTest(unittest.TestCase):
         self.assertIn("unknown region", complained[0])
 
     def test_a_dump_that_is_not_here_is_named_rather_than_guessed_at(self) -> None:
-        complained = []
+        complained: list[Any] = []
         original = pack.REGIONS["usa"]
         pack.REGIONS["usa"] = original._replace(retail=Path("/nowhere/at/all.sfc"))
         try:
@@ -218,7 +219,7 @@ class EntryTest(unittest.TestCase):
         self.assertIn("nowhere", " ".join(complained))
 
     def test_a_table_that_does_not_pass_the_gate_stops_the_build(self) -> None:
-        complained = []
+        complained: list[Any] = []
 
         with a_dump_in_place():
             code = pack.main(
@@ -232,10 +233,10 @@ class EntryTest(unittest.TestCase):
         self.assertIn("does not pass the gate", " ".join(complained))
 
     def test_a_patch_that_will_not_assemble_stops_it_too(self) -> None:
-        def boom(_region, _workdir):
+        def boom(_region: str, _workdir: Path) -> Any:
             raise pack.AssemblyFailed("asar said no")
 
-        complained = []
+        complained: list[Any] = []
         with tempfile.TemporaryDirectory() as tmp, a_dump_in_place():
             code = pack.main(
                 ["pack.py", "usa"],
@@ -250,7 +251,7 @@ class EntryTest(unittest.TestCase):
         self.assertIn("asar said no", complained[0])
 
     def test_a_whole_run_writes_an_image_and_a_manifest(self) -> None:
-        said = []
+        said: list[Any] = []
         with tempfile.TemporaryDirectory() as tmp, a_dump_in_place():
             code = pack.main(
                 ["pack.py", "usa"],

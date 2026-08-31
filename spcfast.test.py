@@ -3,7 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -56,7 +56,7 @@ class PatchShapeTest(unittest.TestCase):
 
 
 class DriverTest(unittest.TestCase):
-    def run_covering(self, offset):
+    def run_covering(self, offset: int) -> tuple[int, bytes]:
         for at, data in spcfast.PATCH:
             if at <= offset < at + len(data):
                 return at, data
@@ -94,7 +94,7 @@ class ChecksumTest(unittest.TestCase):
 
 
 class ApplyTest(unittest.TestCase):
-    def make_rom(self):
+    def make_rom(self) -> bytes:
         rom = bytearray(0x400000)
         for at, want in spcfast.STOCK_PROBE:
             rom[at : at + len(want)] = want
@@ -131,7 +131,11 @@ class ApplyTest(unittest.TestCase):
 
 @unittest.skipUnless(USA.exists() and JP.exists(), "the retail ROMs are not present")
 class RetailRomTest(unittest.TestCase):
+    jp: ClassVar[Any]
+    usa: ClassVar[Any]
+
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         cls.usa = dump.read(USA)
         cls.jp = dump.read(JP)
@@ -262,14 +266,14 @@ class FrameHookTest(unittest.TestCase):
 class EntryTest(unittest.TestCase):
     """The command line, run with both streams collected rather than printed."""
 
-    def _paths(self):
+    def _paths(self) -> tuple[Path, Path]:
         where = Path(tempfile.mkdtemp())
         source = where / "in.sfc"
         source.write_bytes(USA.read_bytes())
         return source, where / "out.sfc"
 
     def test_too_few_arguments_are_refused_with_the_usage(self) -> None:
-        complained = []
+        complained: list[Any] = []
 
         code = spcfast.main(["spcfast.py"], say=lambda _l: None, complain=complained.append)
 
@@ -279,7 +283,7 @@ class EntryTest(unittest.TestCase):
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
     def test_patching_the_source_in_place_is_refused(self) -> None:
         source, _ = self._paths()
-        complained = []
+        complained: list[Any] = []
 
         code = spcfast.main(
             ["spcfast.py", str(source), str(source)],
@@ -293,7 +297,7 @@ class EntryTest(unittest.TestCase):
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
     def test_a_run_writes_the_patched_image_and_says_what_it_did(self) -> None:
         source, output = self._paths()
-        said = []
+        said: list[Any] = []
 
         code = spcfast.main(["spcfast.py", str(source), str(output)], say=said.append)
 

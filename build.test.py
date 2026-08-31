@@ -20,6 +20,12 @@ def load_module() -> Any:
 bd = load_module()
 
 
+def _record(into: list[Any], args: list[str]) -> int:
+    """Note what was shelled out and report success, which append alone cannot do."""
+    into.append(args)
+    return 0
+
+
 class ImageTest(unittest.TestCase):
     def test_the_image_tag_is_pinned_not_latest(self) -> None:
         self.assertNotIn(":latest", bd.IMAGE)
@@ -108,7 +114,7 @@ class ToolchainTest(unittest.TestCase):
         self.assertIn("pinned", bd.missing_message("docker"))
 
     def test_an_absent_toolchain_exits_one_and_says_so_on_stderr(self) -> None:
-        def absent():
+        def absent() -> Any:
             raise bd.ToolchainMissing("docker is not on PATH")
 
         original, bd.main = bd.main, absent
@@ -131,7 +137,7 @@ class RunTest(unittest.TestCase):
     """What a build shells out to, checked without shelling out."""
 
     def test_a_command_is_printed_before_it_runs(self) -> None:
-        said = []
+        said: list[Any] = []
 
         bd.run(["docker", "build"], execute=lambda _args: 0, say=said.append)
 
@@ -162,17 +168,17 @@ class ShellingOutTest(unittest.TestCase):
 
 class EntryTest(unittest.TestCase):
     def test_asking_for_the_image_alone_builds_only_that(self) -> None:
-        ran = []
+        ran: list[Any] = []
 
         code = bd.main(
-            ["bd.py", "--image"], execute=lambda args: ran.append(args) or 0, say=lambda _l: None
+            ["bd.py", "--image"], execute=lambda args: _record(ran, args), say=lambda _l: None
         )
 
         self.assertEqual(code, 0)
         self.assertEqual(len(ran), 1)
 
     def test_too_few_arguments_are_refused_with_the_usage(self) -> None:
-        said = []
+        said: list[Any] = []
 
         code = bd.main(["bd.py", "patch.asm"], say=lambda _l: None, complain=said.append)
 
@@ -180,7 +186,7 @@ class EntryTest(unittest.TestCase):
         self.assertIn("usage", said[0])
 
     def test_an_image_that_will_not_build_stops_before_anything_is_staged(self) -> None:
-        said = []
+        said: list[Any] = []
 
         code = bd.main(
             ["bd.py", "patch.asm", "in.sfc", "out.sfc"],
@@ -197,11 +203,11 @@ class EntryTest(unittest.TestCase):
             where = Path(tmp)
             (where / "patch.asm").write_text("; nothing")
             (where / "in.sfc").write_bytes(b"\x00" * 32)
-            ran = []
+            ran: list[Any] = []
 
             code = bd.main(
                 ["bd.py", str(where / "patch.asm"), str(where / "in.sfc"), "out.sfc"],
-                execute=lambda args: ran.append(args) or 0,
+                execute=lambda args: _record(ran, args),
                 say=lambda _l: None,
             )
 

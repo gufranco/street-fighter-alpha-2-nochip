@@ -5,7 +5,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -32,7 +32,7 @@ STAR_OCEAN = ROOT / "roms" / "star-ocean-jp-original.sfc"
 ALPHA2 = ROOT / "roms" / "sfa2-usa-final.sfc"
 
 
-def docker_available():
+def docker_available() -> bool:
     if not shutil.which("docker"):
         return False
     return (
@@ -86,11 +86,12 @@ class WireFormatTest(unittest.TestCase):
 @unittest.skipUnless(STAR_OCEAN.exists() and ALPHA2.exists(), "reference roms are not present")
 class DifferentialTest(unittest.TestCase):
     @classmethod
+    @override
     def setUpClass(cls) -> None:
         if ref.build_image() != 0:
             raise unittest.SkipTest("reference image failed to build")
 
-    def assert_agrees(self, rom, cases):
+    def assert_agrees(self, rom: bytes | bytearray, cases: list[tuple[int, int]]) -> None:
         expected = ref.reference_outputs(rom, cases)
 
         for (offset, length), want in zip(cases, expected, strict=True):
