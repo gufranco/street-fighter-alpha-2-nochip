@@ -1,6 +1,7 @@
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -20,11 +21,16 @@ SCANLEN = re.compile(r"^SCANLEN addr=\w+ steps=(\d+)")
 APU = re.compile(r"^APU frame=(\d+) writes=\d+")
 
 
-def run(image: Path, mapping: str) -> Path:
+def run(image: Path, mapping: str, execute: Callable[..., Any] = subprocess.run) -> Path:
+    """Drive one image and leave the emulator's log behind.
+
+    The reaching out is a parameter so the summarising and the verdict, which
+    are the parts worth testing, can be driven without a container.
+    """
     LOGS.mkdir(parents=True, exist_ok=True)
     log = LOGS / f"{image.stem}{mapping}.txt"
     with log.open("wb") as handle:
-        subprocess.run(
+        execute(
             [
                 "docker",
                 "run",
@@ -109,27 +115,37 @@ def mapping_for(stem: str) -> str:
     return FREE_MAPPING if stem.endswith("-free") else CART_MAPPING
 
 
-def main(argv: list[str]) -> int:
+def main(
+    argv: list[str],
+    images: list[Path] | None = None,
+    drive: Callable[[Path, str], Path] = run,
+    say: Callable[[str], None] = print,
+) -> int:
+    """Drive every built image and report which of them failed.
+
+    The image list and the driving are parameters, so the verdict can be
+    driven without a container and without a build on disk. An image is a
+    failure when it did not load, missed a lookup, or stopped early.
+    """
     wanted = argv[1] if len(argv) > 1 else ""
     rows = []
-    for image in sorted(IMAGES.glob("*.sfc")):
+    for image in sorted(IMAGES.glob("*.sfc")) if images is None else images:
         if wanted and wanted not in image.stem:
             continue
         if image.stem.endswith("-bypass"):
             continue
         mapping = mapping_for(image.stem)
-        summary = summarise(run(image, mapping))
+        summary = summarise(drive(image, mapping))
         rows.append((image.stem, summary))
-        print(
+        say(
             f"  {image.stem:22s} load={summary['load']:4s} frames={summary['frames']:6d} "
             f"lit={summary['lit']:>8s} scans={summary['scans']:6d} "
-            f"misses={summary['misses']:3d} pause={summary['pause']}",
-            flush=True,
+            f"misses={summary['misses']:3d} pause={summary['pause']}"
         )
     failed = [name for name, s in rows if s["load"] != "ok" or s["misses"] or s["frames"] != FRAMES]
-    print(f"\n  {len(rows)} images, {len(failed)} failing")
+    say(f"\n  {len(rows)} images, {len(failed)} failing")
     for name in failed:
-        print(f"    FAIL {name}")
+        say(f"    FAIL {name}")
     return 1 if failed else 0
 
 

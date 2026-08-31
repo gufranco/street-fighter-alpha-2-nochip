@@ -120,5 +120,93 @@ class MappingTest(unittest.TestCase):
         self.assertEqual(compare_audio.CART_MAPPING, validate_all.CART_MAPPING)
 
 
+class ShellOutTest(unittest.TestCase):
+    """The one step that reaches for a container, with the reaching passed in."""
+
+    def test_it_names_the_image_and_the_mapping(self) -> None:
+        asked: list[Any] = []
+
+        validate_all.run(
+            validate_all.ROOT / "build" / "all" / "probe.sfc",
+            "-2",
+            execute=lambda command, **_rest: asked.append(command),
+        )
+
+        self.assertEqual(asked[0][-1], "-2")
+
+    def test_it_returns_the_log_it_wrote(self) -> None:
+        found = validate_all.run(
+            validate_all.ROOT / "build" / "all" / "probe.sfc",
+            "-2",
+            execute=lambda *_a, **_k: None,
+        )
+
+        self.assertEqual(found.name, "probe-2.txt")
+
+
+class CommandTest(unittest.TestCase):
+    """The verdict on a set of images, driven against recorded logs."""
+
+    @staticmethod
+    def log(load: str = "ok", frames: int = validate_all.FRAMES, misses: int = 0) -> str:
+        lines = [f"RESULT load={load} frames={frames}", "BRIGHT frame=1 value=9.0"]
+        lines += [f"SCANLEN addr=104C steps={validate_all.SCAN_BUDGET + 1}"] * misses
+        return "\n".join(lines) + "\n"
+
+    def run_with(self, logs: dict[str, str], argv: str = "") -> tuple[int, list[str]]:
+        where = Path(tempfile.mkdtemp())
+        said: list[str] = []
+
+        def _drive(image: Path, mapping: str) -> Path:
+            written = where / f"{image.stem}{mapping}.txt"
+            written.write_text(logs[image.stem])
+            return written
+
+        code = validate_all.main(
+            ["validate_all.py", argv] if argv else ["validate_all.py"],
+            images=[where / f"{stem}.sfc" for stem in logs],
+            drive=_drive,
+            say=said.append,
+        )
+        return code, said
+
+    def test_an_image_that_loads_and_never_misses_passes(self) -> None:
+        code, said = self.run_with({"jp-base-free": self.log()})
+
+        self.assertEqual((code, "1 images, 0 failing" in "\n".join(said)), (0, True))
+
+    def test_an_image_that_did_not_load_fails(self) -> None:
+        code, said = self.run_with({"jp-base-free": self.log(load="no")})
+
+        self.assertEqual((code, "FAIL jp-base-free" in "\n".join(said)), (1, True))
+
+    def test_an_image_that_missed_a_lookup_fails(self) -> None:
+        code, _ = self.run_with({"jp-base-free": self.log(misses=1)})
+
+        self.assertEqual(code, 1)
+
+    def test_an_image_that_stopped_early_fails(self) -> None:
+        code, _ = self.run_with({"jp-base-free": self.log(frames=10)})
+
+        self.assertEqual(code, 1)
+
+    def test_a_named_image_is_the_only_one_driven(self) -> None:
+        _, said = self.run_with(
+            {"jp-base-free": self.log(), "usa-base-free": self.log()}, argv="jp"
+        )
+
+        self.assertIn("1 images", "\n".join(said))
+
+    def test_a_bypass_image_is_never_driven(self) -> None:
+        _, said = self.run_with({"jp-base-bypass": self.log()})
+
+        self.assertIn("0 images", "\n".join(said))
+
+    def test_the_report_names_what_it_measured(self) -> None:
+        _, said = self.run_with({"jp-base-free": self.log()})
+
+        self.assertIn("load=ok", said[0])
+
+
 if __name__ == "__main__":
     unittest.main()
