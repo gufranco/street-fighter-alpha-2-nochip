@@ -57,19 +57,19 @@ PASSES = (
 )
 
 
-def read_table():
-    table = {}
+def read_table() -> dict[int, int]:
+    table: dict[int, int] = {}
     for line in TABLE.read_text().splitlines():
         source, length = line.split()
         table[int(source)] = int(length)
     return table
 
 
-def write_table(table):
+def write_table(table: dict[int, int]) -> None:
     TABLE.write_text("\n".join(f"{s} {n}" for s, n in sorted(table.items())) + "\n")
 
 
-def build_variants(table):
+def build_variants(table: dict[int, int]) -> Any:
     OUT.mkdir(parents=True, exist_ok=True)
     retail = dump.read(RETAIL)
     fast = spcfast.apply(retail)
@@ -102,7 +102,7 @@ def build_variants(table):
     return built
 
 
-def requests_of(image, extra, frames):
+def requests_of(image: Path, extra: Any, frames: int) -> dict[int, int]:
     result = subprocess.run(
         [
             "docker",
@@ -125,7 +125,7 @@ def requests_of(image, extra, frames):
         text=True,
         check=False,
     )
-    wanted = {}
+    wanted: dict[int, int] = {}
     for line in (result.stdout + result.stderr).splitlines():
         found = SCAN.match(line)
         if not found:
@@ -148,7 +148,7 @@ def main() -> int:
     for iteration in range(1, 21):
         table = read_table()
         images = build_variants(table)
-        candidates = {}
+        candidates: dict[int, int] = {}
         work = [(image, extra, frames) for image in images for _n, extra, frames in PASSES]
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
             for wanted in pool.map(lambda job: requests_of(*job), work):

@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -39,15 +40,15 @@ RETAIL = {
 TAGGED = ROOT / "roms" / "sfa2-usa-vc-sound-restored.sfc"
 
 
-def table(region):
+def table(region: str) -> list[tuple[int, int]]:
     return sorted(jpstreams.STREAMS if region == "jp" else usastreams.STREAMS)
 
 
-def requests(region):
+def requests(region: str) -> dict[int, int]:
     return dict(requests_jp.REQUESTS) if region == "jp" else {}
 
 
-def duplicates(entries):
+def duplicates(entries: list[tuple[int, int]]) -> list[int]:
     seen = set()
     repeated = []
     for source, _ in entries:
@@ -57,8 +58,10 @@ def duplicates(entries):
     return repeated
 
 
-def undecodable(rom, entries):
-    broken = []
+def undecodable(
+    rom: bytes | bytearray, entries: list[tuple[int, int]]
+) -> list[tuple[int, int, str]]:
+    broken: list[tuple[int, int, str]] = []
     for source, length in entries:
         try:
             produced = sdd1.decompress(rom, source, length)
@@ -70,9 +73,11 @@ def undecodable(rom, entries):
     return broken
 
 
-def uncovered(entries, wanted):
+def uncovered(
+    entries: list[tuple[int, int]], wanted: dict[int, int]
+) -> list[tuple[int, int, int | None]]:
     have = dict(entries)
-    missing = []
+    missing: list[tuple[int, int, int | None]] = []
     for address, length in sorted(wanted.items()):
         stored = have.get(address)
         if stored is None or stored < length:
@@ -80,15 +85,17 @@ def uncovered(entries, wanted):
     return missing
 
 
-def worst_scan(entries):
+def worst_scan(entries: list[tuple[int, int]]) -> int:
     if not entries:
         return 0
     keys = [(WINDOW_BASE + (source >> 16), source & 0xFFFF) for source, _ in entries]
     slots = sdd1tables.allocate(keys)
-    return max((slot - address) & 0xFFFF for (_, address), slot in zip(keys, slots, strict=True))
+    found = max((slot - address) & 0xFFFF for (_, address), slot in zip(keys, slots, strict=True))
+    assert isinstance(found, int)
+    return found
 
 
-def check(region):
+def check(region: str) -> list[str]:
     entries = table(region)
     findings = []
 
@@ -120,7 +127,11 @@ def check(region):
     return findings
 
 
-def main(argv, say=print, complain=None):
+def main(
+    argv: list[str],
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     complain = say if complain is None else complain
     wanted = argv[1:] or sorted(RETAIL)

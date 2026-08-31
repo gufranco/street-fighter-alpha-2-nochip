@@ -10,7 +10,7 @@ MENU = 1800
 ROSTER = 18
 
 
-def run(image, matchup, out):
+def run(image: Path, matchup: str, out: Path) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
@@ -38,8 +38,8 @@ def run(image, matchup, out):
     return out
 
 
-def hashes(path):
-    found = {}
+def hashes(path: Path) -> dict[int, str]:
+    found: dict[int, str] = {}
     if not path.exists():
         return found
     for line in path.read_text(errors="replace").splitlines():
@@ -49,7 +49,7 @@ def hashes(path):
     return found
 
 
-def compare(before, after):
+def compare(before: dict[int, str], after: dict[int, str]) -> tuple[list[int], list[int]]:
     shared = sorted(set(before) & set(after))
     differing = [frame for frame in shared if before[frame] != after[frame]]
     return shared, differing

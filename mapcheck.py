@@ -1,6 +1,7 @@
 import importlib.util
 import statistics
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +48,7 @@ RECOVERED_JP = (
 )
 
 
-def table_for(path):
+def table_for(path: str | Path) -> Any:
     name = Path(path).name.lower()
     if "sfz2" in name or name.startswith("jp-"):
         return jpstreams.STREAMS
@@ -56,7 +57,7 @@ def table_for(path):
     raise ValueError(f"cannot tell which region {name} belongs to")
 
 
-def load(table=None):
+def load(table: Any = None) -> list[tuple[int, int]]:
     entries = sorted(jpstreams.STREAMS if table is None else table)
     for source, length in entries:
         if length <= 0:
@@ -64,7 +65,7 @@ def load(table=None):
     return entries
 
 
-def duplicate_sources(entries):
+def duplicate_sources(entries: list[tuple[int, int]]) -> list[int]:
     seen = set()
     repeated = []
     for source, _ in entries:
@@ -74,11 +75,11 @@ def duplicate_sources(entries):
     return repeated
 
 
-def window_key(source):
+def window_key(source: int) -> tuple[int, int]:
     return WINDOW_BASE + (source >> 16), source & 0xFFFF
 
 
-def undecodable(rom, entries):
+def undecodable(rom: bytes | bytearray, entries: list[tuple[int, int]]) -> list[int]:
     broken = []
     for source, length in entries:
         try:
@@ -88,7 +89,7 @@ def undecodable(rom, entries):
     return broken
 
 
-def scan_cost(entries):
+def scan_cost(entries: list[tuple[int, int]]) -> tuple[int, int]:
     if not entries:
         return 0, 0
     keys = [window_key(source) for source, _ in entries]
@@ -97,7 +98,7 @@ def scan_cost(entries):
     return int(statistics.median(distances)), max(distances)
 
 
-def report(rom_path):
+def report(rom_path: str | Path) -> int:
     rom = dump.read(Path(rom_path))
     entries = load(table_for(rom_path))
 
@@ -115,7 +116,11 @@ def report(rom_path):
     return 1 if failed else 0
 
 
-def main(argv, say=print, complain=None):
+def main(
+    argv: list[str],
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     complain = say if complain is None else complain
     if len(argv) != 2:

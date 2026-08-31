@@ -2,6 +2,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 IMAGES = ROOT / "build" / "all"
@@ -19,7 +20,7 @@ SCANLEN = re.compile(r"^SCANLEN addr=\w+ steps=(\d+)")
 APU = re.compile(r"^APU frame=(\d+) writes=\d+")
 
 
-def run(image, mapping):
+def run(image: Path, mapping: str) -> Path:
     LOGS.mkdir(parents=True, exist_ok=True)
     log = LOGS / f"{image.stem}{mapping}.txt"
     with log.open("wb") as handle:
@@ -51,10 +52,10 @@ def run(image, mapping):
     return log
 
 
-def summarise(log):
+def summarise(log: Path) -> dict[str, Any]:
     loaded, frames = "?", 0
     samples, lit, misses, scans = 0, 0, 0, 0
-    burst_frames = []
+    burst_frames: list[int] = []
     for line in log.read_text(errors="replace").splitlines():
         found = RESULT.match(line)
         if found:
@@ -83,9 +84,9 @@ def summarise(log):
     }
 
 
-def longest_burst(frames):
+def longest_burst(frames: list[int]) -> int:
     best = run_length = 0
-    previous = None
+    previous: int | None = None
     for frame in frames:
         run_length = run_length + 1 if previous is not None and frame == previous + 1 else 1
         previous = frame
@@ -97,7 +98,7 @@ FREE_MAPPING = "-2"
 CART_MAPPING = "-1"
 
 
-def mapping_for(stem):
+def mapping_for(stem: str) -> str:
     """Which map an image is read through, decided by the form it was built in.
 
     A converted image is windowed, because it is larger than the address space

@@ -1,6 +1,8 @@
 import sys
 from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -30,32 +32,41 @@ Outcome = namedtuple("Outcome", "destination dmap cpu")
 
 
 class SnesMemory:
-    def __init__(self, image, banks=rombuild.IMAGE_BANKS):
+    def __init__(self, image: bytes | bytearray, banks: int = rombuild.IMAGE_BANKS) -> None:
         self.image = image
         self.banks = banks
-        self.ram = {}
-        self.triggered = None
+        self.ram: dict[int, int] = {}
+        self.triggered: dict[int, int] | None = None
 
-    def read8(self, address):
+    def read8(self, address: int) -> int:
         bank, offset = address >> 16, address & 0xFFFF
         if bank in rombuild.WRAM_BANKS:
             return self.ram.get(address, 0x00)
         if (bank < 0x40 or 0x80 <= bank < 0xC0) and offset < mapper.HALF:
             return self.ram.get(address, 0x00)
-        return self.image[mapper.address_to_file(bank, offset, self.banks)]
+        at = mapper.address_to_file(bank, offset, self.banks)
+        assert isinstance(at, int)
+        return self.image[at]
 
-    def write8(self, address, value):
+    def write8(self, address: int, value: int) -> None:
         self.ram[address] = value & 0xFF
         if address == DMA_TRIGGER:
             self.triggered = {a: self.ram.get(a, 0x00) for a in DMA_BLOCK}
 
 
-def dma_source(snapshot, channel=0x00):
+def dma_source(snapshot: bytes | bytearray, channel: int = 0x00) -> int:
     base = DMA_BASE + channel
     return snapshot[base + 2] | (snapshot[base + 3] << 8) | (snapshot[base + 4] << 16)
 
 
-def translate(memory, source, channel=0x00, entry=None, dmap=ARMED_DMAP, **registers):
+def translate(
+    memory: Any,
+    source: int,
+    channel: int = 0x00,
+    entry: Any = None,
+    dmap: int = ARMED_DMAP,
+    **registers: Any,
+) -> Any:
     """Run the translation the way the cartridge runs it, and read the result.
 
     Native mode is not a detail. The processor powers on in emulation mode, where
@@ -90,7 +101,9 @@ def translate(memory, source, channel=0x00, entry=None, dmap=ARMED_DMAP, **regis
     return Outcome(destination, memory.ram[base], cpu)
 
 
-def walk(memory, entries, expected, say):
+def walk(
+    memory: Any, entries: list[Any], expected: dict[int, int], say: Callable[[str], None]
+) -> int:
     """Every stream translated on the processor, and where it disagreed."""
     failures = 0
     for entry in entries:
@@ -108,7 +121,11 @@ def walk(memory, entries, expected, say):
     return failures
 
 
-def main(argv=None, say=print, complain=None):
+def main(
+    argv: list[str] | None = None,
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     argv = sys.argv if argv is None else argv
     complain = say if complain is None else complain

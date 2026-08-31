@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -83,7 +84,7 @@ FRAME_HOOK = bytes.fromhex("")
 FRAME_HOOK_SITES = (0x000208, 0x00020C)
 
 
-def frame_hook_site(rom):
+def frame_hook_site(rom: bytes | bytearray) -> int:
     for site in FRAME_HOOK_SITES:
         window = rom[site : site + len(JOYPAD_WAIT)]
         if window == JOYPAD_WAIT or window[: len(FRAME_HOOK)] == FRAME_HOOK:
@@ -91,13 +92,13 @@ def frame_hook_site(rom):
     raise ValueError("the frame interrupt's joypad wait is at neither known position")
 
 
-def runs_for(rom):
+def runs_for(rom: bytes | bytearray) -> tuple[tuple[int, bytes], ...]:
     if not FRAME_HOOK:
         return PATCH
     return (*PATCH, (frame_hook_site(rom), FRAME_HOOK))
 
 
-def checksum(rom):
+def checksum(rom: bytes | bytearray) -> int:
     zeroed = bytearray(rom)
     zeroed[CHECKSUM_FIELD : CHECKSUM_FIELD + 4] = bytes(4)
     return (sum(zeroed) + CHECKSUM_FIELD_SUM) & 0xFFFF
@@ -113,11 +114,11 @@ def write_checksum(rom: bytes | bytearray) -> bytes:
     return bytes(stamped)
 
 
-def patch_bytes():
+def patch_bytes() -> int:
     return sum(len(data) for _, data in PATCH) + len(FRAME_HOOK)
 
 
-def find_blank_gates(rom):
+def find_blank_gates(rom: bytes | bytearray) -> list[int]:
     found = []
     position = rom.find(BLANK_GATE, 0x070000)
     while position != -1 and position < 0x080000:
@@ -126,7 +127,7 @@ def find_blank_gates(rom):
     return found
 
 
-def is_stock(rom):
+def is_stock(rom: bytes | bytearray) -> bool:
     return all(rom[at : at + len(want)] == want for at, want in STOCK_PROBE)
 
 
@@ -146,7 +147,11 @@ def apply(rom: bytes | bytearray) -> bytes:
     return write_checksum(patched)
 
 
-def main(argv, say=print, complain=None):
+def main(
+    argv: list[str],
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     complain = say if complain is None else complain
     if len(argv) != 3:

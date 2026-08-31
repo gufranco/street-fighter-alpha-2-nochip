@@ -32,11 +32,13 @@ TABLE_BANK = 0x60
 SCAN_BUDGET = 64
 
 
-def window_read(image, banks, bank, address):
-    return image[mapper.address_to_file(bank, address, banks)]
+def window_read(image: bytes | bytearray, banks: int, bank: int, address: int) -> int:
+    at = mapper.address_to_file(bank, address, banks)
+    assert isinstance(at, int)
+    return image[at]
 
 
-def resolve(image, banks, source):
+def resolve(image: bytes | bytearray, banks: int, source: int) -> tuple[int | None, int | None]:
     bank = WINDOW_BASE + (source >> 16)
     cursor = source & 0xFFFF
     for step in range(SCAN_BUDGET + 1):
@@ -49,11 +51,11 @@ def resolve(image, banks, source):
     return None, None
 
 
-def carries_game_fixes(path):
+def carries_game_fixes(path: str | Path) -> bool:
     return "-both-" in Path(path).name.lower()
 
 
-def region_of(path):
+def region_of(path: str | Path) -> tuple[Any, Path]:
     name = Path(path).name.lower()
     if name.startswith("jp-") or "sfz2" in name:
         return jpstreams.STREAMS, ROOT / "roms" / "sfz2-jp-final.sfc"

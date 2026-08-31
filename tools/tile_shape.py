@@ -30,8 +30,9 @@ Usage:
 import importlib.util
 import os
 import sys
-from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, NamedTuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -65,13 +66,17 @@ nothing. The threshold is stated rather than tuned: it is sixteen tiles, the
 smallest sheet where a single coincidence does not dominate the fraction.
 """
 
-Survey = namedtuple(
-    "Survey",
-    "aligned unaligned meanReuse meanReuseOfNoise withAnyRepeat noiseWithAnyRepeat",
-)
+
+class Survey(NamedTuple):
+    aligned: int
+    unaligned: int
+    meanReuse: float
+    meanReuseOfNoise: float
+    withAnyRepeat: int
+    noiseWithAnyRepeat: int
 
 
-def tiles(data):
+def tiles(data: bytes | bytearray | None) -> list[tuple[int, ...]] | None:
     """The run cut into tiles by the model, or nothing when it is not tiles.
 
     The model raises rather than padding, which is the behaviour wanted: a run
@@ -87,7 +92,7 @@ def tiles(data):
     return [tuple(one) for one in found]
 
 
-def reuse(data):
+def reuse(data: bytes | bytearray | None) -> float | None:
     """What fraction of the tiles are not the first of their kind."""
     cut = tiles(data)
     if cut is None:
@@ -95,12 +100,12 @@ def reuse(data):
     return 1 - len(set(cut)) / len(cut)
 
 
-def noise(length):
+def noise(length: int) -> bytes:
     """Random bytes, which is what a reading has to be compared against."""
     return os.urandom(length)
 
 
-def survey(runs):
+def survey(runs: list[bytes]) -> Survey:
     """Every run measured, each against a control of its own length."""
     aligned = unaligned = 0
     real, control = [], []
@@ -122,7 +127,7 @@ def survey(runs):
     )
 
 
-def table_for(where):
+def table_for(where: Path | str) -> Any:
     """The stream table belonging to whichever cartridge this is."""
     name = "usastreams" if "usa" in Path(where).name.lower() else "jpstreams"
     root = Path(__file__).resolve().parent.parent
@@ -133,7 +138,7 @@ def table_for(where):
     return module.STREAMS
 
 
-def against(where, limit=None):
+def against(where: Path | str, limit: int | None = None) -> Survey:
     """Every stream the cartridge declares, decompressed and measured."""
     rom = bytearray(Path(where).read_bytes())
     runs = []
@@ -147,7 +152,7 @@ def against(where, limit=None):
     return survey(runs)
 
 
-def main(argv, say=print):
+def main(argv: list[str], say: Callable[[str], None] = print) -> int:
     if not argv:
         say("usage: tile_shape.py <rom> [streams]")
         return 2

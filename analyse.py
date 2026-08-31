@@ -12,13 +12,17 @@ BLOCK = 65536
 COMPRESSED_RATIO = 0.85
 
 
-def compressed_share(data, block=BLOCK, threshold=COMPRESSED_RATIO):
+def compressed_share(
+    data: bytes | bytearray, block: int = BLOCK, threshold: float = COMPRESSED_RATIO
+) -> tuple[int, int, list[float]]:
     ratios = dump.block_ratios(data, block)
     hits = sum(1 for r in ratios if r > threshold)
     return hits, len(ratios), ratios
 
 
-def novelty(candidate, reference, chunk=1024):
+def novelty(
+    candidate: bytes | bytearray, reference: bytes | bytearray, chunk: int = 1024
+) -> tuple[int, int]:
     index = dump.chunk_index(reference, chunk=chunk, stride=512)
     new = total = 0
     for i in range(0, len(candidate) - chunk + 1, chunk):
@@ -28,15 +32,15 @@ def novelty(candidate, reference, chunk=1024):
     return new, total
 
 
-def estimate_expanded(compressed_bytes, total_bytes, ratio):
+def estimate_expanded(compressed_bytes: int, total_bytes: int, ratio: float) -> int:
     return int(total_bytes + compressed_bytes * (ratio - 1))
 
 
-def mbit(size):
+def mbit(size: float) -> float:
     return size * 8 / 1048576
 
 
-def report(label, data):
+def report(label: str, data: bytes | bytearray) -> int:
     hits, blocks, _ = compressed_share(data)
     comp_bytes = hits * BLOCK
     print(

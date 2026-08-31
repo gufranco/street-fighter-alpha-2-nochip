@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +29,7 @@ usastreams = load("usastreams")
 
 BATCH = 200
 
-SETS = {
+SETS: dict[str, tuple[Path, Callable[[], list[Any]]]] = {
     "usa": (
         ROOT / "roms" / "sfa2-usa-final.sfc",
         lambda: list(usastreams.STREAMS),
@@ -51,11 +52,11 @@ def batches(cases: list[Any], size: int = BATCH) -> list[list[Any]]:
     return [cases[start : start + size] for start in range(0, len(cases), size)]
 
 
-def verify(region: str) -> int:
+def verify(region: str) -> tuple[list[Any], list[Any]]:
     retail, cases_for = SETS[region]
     rom = dump.read(retail)
-    cases = cases_for()
-    mismatches = []
+    cases: list[Any] = cases_for()
+    mismatches: list[Any] = []
     checked = 0
     for chunk in batches(cases):
         checked += len(chunk)

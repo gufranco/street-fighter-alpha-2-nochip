@@ -37,7 +37,7 @@ BYPASS = {"usa": "sdd1-bypass.asm", "jp": "sdd1-bypass-jp.asm"}
 TAGGED = ROOT / "roms" / "sfa2-usa-vc-sound-restored.sfc"
 
 
-def variants(retail):
+def variants(retail: bytes | bytearray) -> dict[str, bytes]:
     fast = spcfast.apply(retail)
     return {
         "base": retail,
@@ -47,12 +47,12 @@ def variants(retail):
     }
 
 
-def entries_for(region):
+def entries_for(region: str) -> Any:
     table = load("jpstreams" if region == "jp" else "usastreams").STREAMS
     return rombuild.entries_from_map({str(source): length for source, length in table})
 
 
-def assemble(region, name, cart):
+def assemble(region: str, name: str, cart: bytes | bytearray) -> Path:
     staged = OUT / f"{region}-{name}-cart.sfc"
     staged.write_bytes(cart)
     output = f"{region}-{name}-bypass.sfc"
@@ -78,7 +78,7 @@ def assemble(region, name, cart):
 PREFIGHT_VARIANT = "both"
 
 
-def image_source(name, bypass):
+def image_source(name: str, bypass: Path) -> tuple[Any, tuple[Any, ...]]:
     rom = dump.read(bypass)
     if name != PREFIGHT_VARIANT:
         return rom, ()

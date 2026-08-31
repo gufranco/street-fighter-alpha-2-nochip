@@ -1,6 +1,7 @@
 import sys
 from collections import namedtuple
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -41,14 +42,14 @@ class AllocationError(Exception):
     pass
 
 
-def load_entries(tagged):
+def load_entries(tagged: bytes | bytearray) -> list[Any]:
     entries = sdd1map.build_map(tagged)
     if not entries or entries[-1].length is not None:
         return entries
     return sdd1map.build_map(tagged, gfx_size=entries[-1].target + FINAL_STREAM_LENGTH)
 
 
-def entries_from_map(mapping):
+def entries_from_map(mapping: dict[Any, int]) -> list[Any]:
     ordered = sorted((int(source), length) for source, length in mapping.items())
     return [
         sdd1map.Entry(index=index, source=source, target=None, length=length)
@@ -56,7 +57,7 @@ def entries_from_map(mapping):
     ]
 
 
-def data_bank_regions():
+def data_bank_regions() -> list[Region]:
     reserved = set(range(TABLE_BANK, TABLE_BANK + TABLE_COUNT)) | set(WRAM_BANKS)
     return [
         Region(bank, 0x0000, mapper.BANK)
@@ -65,15 +66,15 @@ def data_bank_regions():
     ]
 
 
-def spans_of(extra):
+def spans_of(extra: tuple[Any, ...]) -> list[Region]:
     return [
         Region(address >> 16, address & 0xFFFF, (address & 0xFFFF) + len(data))
         for address, data in extra
     ]
 
 
-def subtract(regions, taken):
-    out = []
+def subtract(regions: list[Region], taken: list[Region]) -> list[Region]:
+    out: list[Region] = []
     for region in regions:
         pieces = [(region.start, region.end)]
         for hole in taken:
@@ -93,8 +94,8 @@ def subtract(regions, taken):
     return out
 
 
-def reclaimed_regions(rom, entries):
-    spans = []
+def reclaimed_regions(rom: bytes | bytearray, entries: list[Any]) -> list[Region]:
+    spans: list[Region] = []
     for entry in entries:
         if entry.length is None:
             continue
@@ -112,8 +113,8 @@ def reclaimed_regions(rom, entries):
     return [r for r in merge(spans) if r.end - r.start >= MIN_REGION]
 
 
-def merge(regions):
-    merged = []
+def merge(regions: list[Region]) -> list[Region]:
+    merged: list[Region] = []
     for region in sorted(regions, key=lambda r: (r.bank, r.start)):
         if merged and merged[-1].bank == region.bank and merged[-1].end >= region.start:
             last = merged[-1]
@@ -123,12 +124,12 @@ def merge(regions):
     return merged
 
 
-def allocate(sizes, regions):
+def allocate(sizes: list[tuple[int, int]], regions: list[Region]) -> dict[int, int]:
     free = sorted(merge(regions), key=lambda region: (region.bank, region.start))
     if not free:
         raise AllocationError("no free regions offered")
 
-    placed = {}
+    placed: dict[int, int] = {}
     cursor = [region.start for region in free]
 
     for key, size in sizes:
@@ -146,7 +147,7 @@ def allocate(sizes, regions):
     return placed
 
 
-def place(image, bank, addr, data, banks):
+def place(image: bytearray, bank: int, addr: int, data: bytes | bytearray, banks: int) -> None:
     written = 0
     while written < len(data):
         edge = mapper.HALF if addr < mapper.HALF else mapper.BANK
@@ -160,7 +161,12 @@ def place(image, bank, addr, data, banks):
             bank += 1
 
 
-def build(rom, entries, image_banks=IMAGE_BANKS, extra=()):
+def build(
+    rom: bytes | bytearray,
+    entries: list[Any],
+    image_banks: int = IMAGE_BANKS,
+    extra: tuple[Any, ...] = (),
+) -> Any:
     if len(rom) != ORIGINAL_SIZE:
         raise ValueError(f"expected a {ORIGINAL_SIZE} byte rom, got {len(rom)}")
 
