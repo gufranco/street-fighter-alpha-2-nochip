@@ -1,6 +1,7 @@
 import importlib.util
 import shutil
 import subprocess
+import contextlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -169,6 +170,27 @@ class AssembleTest(unittest.TestCase):
         self.assertEqual(found, b"\xab" * 32)
 
 
+@contextlib.contextmanager
+def a_dump_in_place(region="usa"):
+    """Point a region at a file that exists, so the presence check lets a run through.
+
+    These cases drive `pack.main` past the point where it looks for the dump, and
+    what they check has nothing to do with the dump's contents: the builder is
+    injected. Pointing the region at a temporary file rather than skipping is what
+    lets them run on a machine that holds no cartridge, which is every machine but
+    the author's.
+    """
+    original = pack.REGIONS[region]
+    with tempfile.TemporaryDirectory() as where:
+        stand_in = Path(where) / "stand-in.sfc"
+        stand_in.write_bytes(b"\x00")
+        pack.REGIONS[region] = original._replace(retail=stand_in)
+        try:
+            yield stand_in
+        finally:
+            pack.REGIONS[region] = original
+
+
 class EntryTest(unittest.TestCase):
     """A run from the command line, with the slow steps passed in."""
 
@@ -196,12 +218,13 @@ class EntryTest(unittest.TestCase):
     def test_a_table_that_does_not_pass_the_gate_stops_the_build(self):
         complained = []
 
-        code = pack.main(
-            ["pack.py", "usa"],
-            gate_check=lambda _region: ["a stream is missing"],
-            say=lambda _l: None,
-            complain=complained.append,
-        )
+        with a_dump_in_place():
+            code = pack.main(
+                ["pack.py", "usa"],
+                gate_check=lambda _region: ["a stream is missing"],
+                say=lambda _l: None,
+                complain=complained.append,
+            )
 
         self.assertIn(code, (1,))
         self.assertIn("does not pass the gate", " ".join(complained))
@@ -211,7 +234,7 @@ class EntryTest(unittest.TestCase):
             raise pack.AssemblyFailed("asar said no")
 
         complained = []
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, a_dump_in_place():
             code = pack.main(
                 ["pack.py", "usa"],
                 make=boom,
@@ -226,7 +249,7 @@ class EntryTest(unittest.TestCase):
 
     def test_a_whole_run_writes_an_image_and_a_manifest(self):
         said = []
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, a_dump_in_place():
             code = pack.main(
                 ["pack.py", "usa"],
                 make=lambda _region, _workdir: b"\x00" * 64,
