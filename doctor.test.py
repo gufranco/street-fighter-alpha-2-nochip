@@ -11,8 +11,11 @@ import hardware
 
 
 def _never_asked(_name: str) -> Any:
-    """Handed to a walk that must not reach a load, so reaching one is a failure."""
-    raise AssertionError("nothing should have been loaded")
+    """Handed to a walk that must not reach a load, so reaching one is a failure.
+
+    Never running is the whole point, which is why the body is not measured.
+    """
+    raise AssertionError("nothing should have been loaded")  # pragma: no cover
 
 
 class Complaint(Exception):

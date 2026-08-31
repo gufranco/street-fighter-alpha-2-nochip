@@ -23,9 +23,14 @@ JP = ROOT / "roms" / "sfz2-jp-final.sfc"
 
 
 def retail(path: Path) -> bytes:
-    if not path.exists():
+    """The cartridge, or a skip when this machine does not have it.
+
+    Both arms are decided by what is on disk, so no single run covers both: a
+    machine with the dump never raises and a machine without it never reads.
+    """
+    if not path.exists():  # pragma: no cover
         raise unittest.SkipTest(f"{path} is not present")
-    return path.read_bytes()
+    return path.read_bytes()  # pragma: no cover
 
 
 class RoutineTest(unittest.TestCase):
@@ -52,13 +57,18 @@ class RoutineTest(unittest.TestCase):
         self.assertEqual(len(repeatload.hook()), len(repeatload.REPLACED))
 
     def test_the_routine_matches_what_the_assembler_emits(self) -> None:
+        """What this package emits against what the assembler emits.
+
+        The comparison needs a build that neither a plain checkout nor a runner
+        has, so on both it skips and the body below never runs.
+        """
         assembled = ROOT / "asm" / "repeat-out.sfc"
         if not assembled.exists():
             raise unittest.SkipTest("assemble asm/repeat-load.asm first")
 
-        produced = assembled.read_bytes()
+        produced = assembled.read_bytes()  # pragma: no cover
 
-        self.assertEqual(
+        self.assertEqual(  # pragma: no cover
             produced[repeatload.FILLER_FILE : repeatload.FILLER_FILE + len(repeatload.ROUTINE)],
             repeatload.ROUTINE,
         )

@@ -32,9 +32,14 @@ JP = ROOT / "roms" / "sfz2-jp-final.sfc"
 
 
 def retail(path: Path) -> bytes:
-    if not path.exists():
+    """The cartridge, or a skip when this machine does not have it.
+
+    Both arms are decided by what is on disk, so no single run covers both: a
+    machine with the dump never raises and a machine without it never reads.
+    """
+    if not path.exists():  # pragma: no cover
         raise unittest.SkipTest(f"{path} is not present")
-    return path.read_bytes()
+    return path.read_bytes()  # pragma: no cover
 
 
 def carrier(fix: Any, filler: bytes = b"\x00" * 64) -> bytes:
@@ -333,9 +338,7 @@ class RetailTest(unittest.TestCase):
         rom = retail(USA)
         starts = sorted(start for start, _ in usastreams.STREAMS)
 
-        for fix in gamefixes.FIXES:
-            if "usa" not in fix.regions:
-                continue
+        for fix in [one for one in gamefixes.FIXES if "usa" in one.regions]:
             at = gamefixes.locate(rom, fix.stock)
             inside = [s for s in starts if at < s < at + len(fix.stock)]
 

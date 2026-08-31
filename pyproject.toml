@@ -82,6 +82,11 @@ omit = [
 ]
 
 [tool.coverage.report]
+# The gate holds on a machine that has the cartridges. Measured with them hidden,
+# the same suite reports 95%: every patch module skips, because a patch cannot be
+# applied to a cartridge that is not there. Wiring this into a runner would
+# therefore gate on a number no runner can reach, so the workflow runs the tests
+# and this gate is the developer's, run where the artifacts are.
 fail_under = 100
 show_missing = true
 skip_covered = true
