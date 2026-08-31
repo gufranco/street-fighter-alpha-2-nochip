@@ -40,6 +40,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# The environment checks are the same shape and exist for the same reason: they
+# report what a machine is, so a check that throws has to become a line in the
+# report rather than end the run, and its output is the product.
+"environment.py" = ["BLE001", "T201"]
 # The doctor exists so that nothing fails silently, which means it has to survive
 # whatever a check throws at it and report that rather than propagate it. A
 # narrower catch would let an unforeseen failure escape as a traceback and take

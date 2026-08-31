@@ -33,6 +33,7 @@ prove the checks without needing a cartridge.
 
 import sys
 from pathlib import Path
+from typing import Any, override
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -91,12 +92,13 @@ class Unreadable(Exception):
 class Chain:
     """What walking one sample found: how far it reached, and what stopped it."""
 
-    def __init__(self, start, blocks, reach, fault):
+    def __init__(self, start: int, blocks: int, reach: range, fault: str | None) -> None:
         self.start = start
         self.blocks = blocks
         self.reach = reach
         self.fault = fault
 
+    @override
     def __repr__(self) -> str:
         return f"<Chain at {self.start:#06x}, {self.blocks} blocks, {self.fault or 'ends'}>"
 
@@ -104,29 +106,34 @@ class Chain:
 class Fault:
     """One thing wrong with one sample."""
 
-    def __init__(self, sample, fault, at):
+    def __init__(self, sample: int, fault: str, at: int) -> None:
         self.sample = sample
         self.fault = fault
         self.at = at
 
-    def __eq__(self, other):
+    @override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Fault):
+            return NotImplemented
         return (self.sample, self.fault, self.at) == (other.sample, other.fault, other.at)
 
-    def __hash__(self):
+    @override
+    def __hash__(self) -> int:
         return hash((self.sample, self.fault, self.at))
 
+    @override
     def __repr__(self) -> str:
         return f"<Fault sample {self.sample} at {self.at:#06x}: {self.fault}>"
 
 
-def load(image):
+def load(image: bytes | bytearray) -> bytearray:
     """An audio memory image, refused unless it is the whole sixty four kilobytes."""
     if len(image) != APU_RAM:
         raise Unreadable(f"an audio memory image is {APU_RAM} bytes, not {len(image)}")
     return bytearray(image)
 
 
-def entry(ram, directory, sample):
+def entry(ram: bytearray, directory: int, sample: int) -> tuple[int, int]:
     """The start and loop addresses the directory holds for that sample."""
     at = (directory + sample * DIRECTORY_BYTES) & 0xFFFF
     start = ram[at] | (ram[(at + 1) & 0xFFFF] << 8)
@@ -134,7 +141,7 @@ def entry(ram, directory, sample):
     return start, loop
 
 
-def chain(ram, start):
+def chain(ram: bytearray, start: int) -> Chain:
     """Walk a sample the way the chip walks it, and report where it stops.
 
     Nothing bounds this walk except the flag in a block header, so the bound here
@@ -152,7 +159,7 @@ def chain(ram, start):
     return Chain(start, MAX_BLOCKS, range(start, APU_RAM), RUNS_OFF)
 
 
-def _prepare(ram, directory, sample):
+def _prepare(ram: bytearray, directory: int, sample: int) -> Any:
     memory = sdsp.Memory()
     for address, value in enumerate(ram):
         memory.write8(address, value)
@@ -172,19 +179,19 @@ def _prepare(ram, directory, sample):
     return chip
 
 
-def play(ram, directory, sample, samples=RENDER_SAMPLES):
+def play(ram: bytearray, directory: int, sample: int, samples: int = RENDER_SAMPLES) -> Any:
     """What the chip produces from that sample, through the real decoder."""
     return _prepare(ram, directory, sample).render(samples)
 
 
-def reaches_end(ram, directory, sample, samples=RENDER_SAMPLES):
+def reaches_end(ram: bytearray, directory: int, sample: int, samples: int = RENDER_SAMPLES) -> bool:
     """Whether the chip reports finishing the sample within that many samples."""
     chip = _prepare(ram, directory, sample)
     chip.render(samples)
     return bool(chip.read(REG_ENDX) & 0x01)
 
 
-def faults(ram, directory, used):
+def faults(ram: bytearray, directory: int, used: list[int]) -> list[Fault]:
     """Everything wrong with the samples that are actually in use."""
     found = []
     for sample in used:
@@ -200,9 +207,9 @@ def faults(ram, directory, used):
     return found
 
 
-def overlaps(ram, directory, used):
+def overlaps(ram: bytearray, directory: int, used: list[int]) -> list[tuple[int, int, int]]:
     """Pairs of different samples that share bytes, which one upload can damage."""
-    reached = {}
+    reached: dict[int, tuple[int, set[int]]] = {}
     for sample in used:
         start, _ = entry(ram, directory, sample)
         walked = chain(ram, start)
@@ -221,7 +228,9 @@ def overlaps(ram, directory, used):
     return found
 
 
-def collisions(ram, directory, playing, written):
+def collisions(
+    ram: bytearray, directory: int, playing: list[int], written: list[int]
+) -> list[Fault]:
     """Which playing samples an upload would walk through while they are playing."""
     touched = set(written)
     found = []
@@ -238,7 +247,7 @@ def collisions(ram, directory, playing, written):
     return found
 
 
-def report(ram, directory, used):
+def report(ram: bytearray, directory: int, used: list[int]) -> list[str]:
     """Everything this can say about a bank, as lines a person reads."""
     lines = []
     for fault in faults(ram, directory, used):
@@ -256,7 +265,7 @@ def main(argv: list[str]) -> int:
         return 2
     ram = load(Path(argv[0]).read_bytes())
     directory = int(argv[1], 0)
-    used = [int(name, 0) for name in argv[2:]] or range(0x100)
+    used = [int(name, 0) for name in argv[2:]] or list(range(0x100))
     for line in report(ram, directory, used):
         print(line)
     return 0

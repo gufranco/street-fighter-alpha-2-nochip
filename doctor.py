@@ -26,9 +26,13 @@ import importlib
 import platform
 import shutil
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, override
 
 ROOT = Path(__file__).resolve().parent
+
+import environment  # noqa: E402
 
 sys.path.insert(0, str(ROOT))
 
@@ -53,29 +57,30 @@ TOOLS = ("docker",)
 class Finding:
     """One thing that was looked at, and what was there."""
 
-    def __init__(self, name, ok, detail, advice=None):
+    def __init__(self, name: str, ok: bool, detail: str, advice: str | None = None) -> None:
         self.name = name
         self.ok = ok
         self.detail = detail
         self.advice = advice
 
     @property
-    def line(self):
+    def line(self) -> str:
         """The one-line form, which is what a reader scans."""
         return f"  {'ok  ' if self.ok else '   !'}  {self.name}: {self.detail}"
 
     @property
-    def report(self):
+    def report(self) -> str:
         """The same, with what to do about it when there is something to do."""
         if self.ok or not self.advice:
             return self.line
         return f"{self.line}\n         {self.advice}"
 
+    @override
     def __repr__(self) -> str:
         return f"<Finding {self.name} {'ok' if self.ok else 'not ok'}>"
 
 
-def _python():
+def _python() -> Finding:
     return Finding(
         "python",
         sys.version_info[:2] >= OLDEST_PYTHON,
@@ -84,16 +89,16 @@ def _python():
     )
 
 
-def _project():
+def _project() -> Finding:
     return Finding(PROJECT, True, f"version {VERSION}")
 
 
-def _default_import(package):
+def _default_import(package: str) -> Any:
     hardware.install()
     return importlib.import_module(package)
 
 
-def _model(package, where, load):
+def _model(package: str, where: Path, load: Callable[[str], Any]) -> Finding:
     """Whether that model is checked out and imports, and which version it is."""
     if not Path(where).is_dir() or not any(Path(where).iterdir()):
         return Finding(
@@ -116,12 +121,12 @@ def _model(package, where, load):
     return Finding(package, True, f"version {getattr(found, 'VERSION', 'not stated')}")
 
 
-def _default_cartridges():
+def _default_cartridges() -> list[Any]:
     manifest = identify.read_manifest()
     return [identify.diagnose(one, manifest) for one in manifest["artifacts"]]
 
 
-def _cartridges(diagnose=_default_cartridges):
+def _cartridges(diagnose: Callable[[], list[Any]] = _default_cartridges) -> list[Finding]:
     """Every dump this project reads, and whether the one here is the one it wants.
 
     A region with no digests published yet is reported and is not a failure. It
@@ -155,12 +160,12 @@ def _cartridges(diagnose=_default_cartridges):
     return lines
 
 
-def _default_decompress():
+def _default_decompress() -> Any:
     stream = bytes(range(256))
     return _default_import("sdd1").decompress(stream, 0, 8)
 
 
-def _decompressor(decompress=_default_decompress):
+def _decompressor(decompress: Callable[[], Any] = _default_decompress) -> Finding:
     """That the decompressor is wired here, rather than merely importable.
 
     Every image this project builds is an expansion of streams that came out of
@@ -179,7 +184,7 @@ def _decompressor(decompress=_default_decompress):
     return Finding("decompressor", True, f"decoded {len(found)} bytes of a stream nobody owns")
 
 
-def _tools(named=TOOLS, look=shutil.which):
+def _tools(named: Any = TOOLS, look: Any = shutil.which) -> list[Finding]:
     """What a build shells out to, and whether this machine has it.
 
     Absent, the analysis still runs and the build does not. That is worth saying
@@ -199,7 +204,7 @@ def _tools(named=TOOLS, look=shutil.which):
     return lines
 
 
-def _default_beneath():
+def _default_beneath() -> list[tuple[str, bool]]:
     """Every model that carries a doctor, asked for its own report.
 
     A model with no doctor is passed over rather than reported: not every one of
@@ -210,9 +215,11 @@ def _default_beneath():
     return _ask_each(sorted(hardware.PACKAGES), hardware.root_of, importlib.import_module)
 
 
-def _ask_each(packages, locate, load):
+def _ask_each(
+    packages: list[str], locate: Callable[[str], Path], load: Callable[[str], Any]
+) -> list[tuple[str, bool]]:
     """Each named model asked for its report, skipping the ones that have none."""
-    found = []
+    found: list[tuple[str, bool]] = []
     for package in packages:
         where = Path(locate(package))
         if not where.is_dir():
@@ -227,12 +234,12 @@ def _ask_each(packages, locate, load):
     return found
 
 
-def _default_unused():
+def _default_unused() -> tuple[str, ...]:
     """Findings from a model that are about something this cartridge does not carry."""
     return ()
 
 
-def _beneath(beneath, unused=_default_unused):
+def _beneath(beneath: Any, unused: Any = _default_unused) -> list[Finding]:
     """Everything the models found, each filed under the name of its repository.
 
     One adjustment is made on the way through, and it is worth saying exactly
@@ -271,7 +278,7 @@ def _beneath(beneath, unused=_default_unused):
     return lines
 
 
-def examine(load=_default_import, beneath=_default_beneath):
+def examine(load: Any = _default_import, beneath: Any = _default_beneath) -> list[Finding]:
     """Everything worth looking at on this machine, in the order a reader wants it."""
     found = [_python(), _project()]
     found.extend(
@@ -284,10 +291,14 @@ def examine(load=_default_import, beneath=_default_beneath):
     return found
 
 
-def report(found):
+def report(found: list[Finding]) -> list[str]:
     """The lines a person pastes into an issue."""
     unwell = [one for one in found if not one.ok]
     lines = [f"{PROJECT} {VERSION} on {platform.python_version()}, {platform.system()}", ""]
+    lines.append("  the machine")
+    lines.extend(environment.lines(ROOT))
+    lines.append("")
+    lines.append("  this package")
     lines.extend(one.report for one in found)
     lines.append("")
     if unwell:
@@ -297,7 +308,7 @@ def report(found):
     return lines
 
 
-def main(argv=(), examine=examine, say=print):
+def main(argv: Any = (), examine: Any = examine, say: Callable[[str], None] = print) -> int:
     found = examine()
     for line in report(found):
         say(line)

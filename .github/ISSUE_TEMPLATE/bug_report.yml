@@ -15,10 +15,21 @@ body:
     attributes:
       label: What the doctor says
       description: |
-        Run `python3 doctor.py` from the repository and paste all of it, including
-        every line that did not pass. Do not trim it: the lines that failed are
-        the ones worth reading, and the digests are what settle which files you
-        have.
+        Run this from the repository and paste every line, including the ones
+        that did not pass. Those are the ones worth reading, so do not trim it.
+
+        macOS and Linux:
+
+            python3 -m doctor
+
+        Windows, whichever of these resolves:
+
+            python -m doctor
+            py -3 -m doctor
+
+        It reports the machine as well as the package, so most answers are in
+        there already. If it will not run at all, say so here and paste whatever
+        it printed instead.
       render: text
     validations:
       required: true
