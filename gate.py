@@ -59,12 +59,20 @@ def duplicates(entries: list[tuple[int, int]]) -> list[int]:
 
 
 def undecodable(
-    rom: bytes | bytearray, entries: list[tuple[int, int]]
+    rom: bytes | bytearray,
+    entries: list[tuple[int, int]],
+    decode: Callable[..., Any] = sdd1.decompress,
 ) -> list[tuple[int, int, str]]:
+    """Every entry in the table that the decompressor will not reproduce.
+
+    The decompressor is a parameter so both ways an entry can be wrong, raising
+    and returning the wrong length, can be driven without a cartridge that
+    happens to contain one.
+    """
     broken: list[tuple[int, int, str]] = []
     for source, length in entries:
         try:
-            produced = sdd1.decompress(rom, source, length)
+            produced = decode(rom, source, length)
         except (sdd1.TruncatedStream, IndexError, ValueError):
             broken.append((source, length, "raised"))
             continue
@@ -95,24 +103,41 @@ def worst_scan(entries: list[tuple[int, int]]) -> int:
     return found
 
 
-def check(region: str) -> list[str]:
-    entries = table(region)
+def check(
+    region: str,
+    entries: list[tuple[int, int]] | None = None,
+    wanted: dict[int, int] | None = None,
+    retail: Path | None = None,
+    decode: Callable[..., Any] = sdd1.decompress,
+) -> list[str]:
+    """Everything wrong with one region's table, or an empty list.
+
+    The table, the observed requests and the cartridge are parameters so each
+    finding can be driven on its own. A missing cartridge is not a finding: the
+    decode check is simply not run, and the others still are.
+
+    The scan check is skipped when a source repeats, because two entries under
+    one key have no placement at all and the allocator raises rather than
+    returning a distance. The repeat is the thing to fix first, and reporting it
+    is worth more than falling over on the way to the next check.
+    """
+    entries = table(region) if entries is None else entries
     findings = []
 
     repeated = duplicates(entries)
     if repeated:
         findings.append(f"{len(repeated)} repeated sources, first {repeated[0]:#08x}")
 
-    retail = RETAIL[region]
+    retail = RETAIL[region] if retail is None else retail
     if retail.exists():
-        broken = undecodable(dump.read(retail), entries)
+        broken = undecodable(dump.read(retail), entries, decode)
         if broken:
             source, length, why = broken[0]
             findings.append(
                 f"{len(broken)} entries do not decode, first {source:#08x} length {length} {why}"
             )
 
-    missing = uncovered(entries, requests(region))
+    missing = uncovered(entries, requests(region) if wanted is None else wanted)
     if missing:
         address, length, stored = missing[0]
         findings.append(
@@ -120,9 +145,10 @@ def check(region: str) -> list[str]:
             f"first {address:#08x} needs {length}, table has {stored}"
         )
 
-    worst = worst_scan(entries)
-    if worst > SCAN_BUDGET:
-        findings.append(f"worst key scan is {worst} slots against a budget of {SCAN_BUDGET}")
+    if not repeated:
+        worst = worst_scan(entries)
+        if worst > SCAN_BUDGET:
+            findings.append(f"worst key scan is {worst} slots against a budget of {SCAN_BUDGET}")
 
     return findings
 
@@ -131,6 +157,8 @@ def main(
     argv: list[str],
     say: Callable[[str], None] = print,
     complain: Callable[[str], None] | None = None,
+    examine: Callable[[str], list[str]] = check,
+    listing: Callable[[str], list[tuple[int, int]]] = table,
 ) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     complain = say if complain is None else complain
@@ -142,8 +170,8 @@ def main(
 
     failed = False
     for region in wanted:
-        findings = check(region)
-        entries = table(region)
+        findings = examine(region)
+        entries = listing(region)
         if findings:
             failed = True
             say(f"  {region}: {len(entries):,} streams, FAIL")
