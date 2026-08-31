@@ -233,6 +233,175 @@ class StockTest(unittest.TestCase):
         self.assertGreater(stock.steps, fast.steps * 3)
 
 
+@NEEDS_A_DUMP
+class ComposedTest(unittest.TestCase):
+    """The same driver on the whole audio unit, which is a second witness.
+
+    Agreeing with the stand-in is the point of these. The stand-in was written to
+    a reading of the driver, so it can only ever confirm that reading is
+    self-consistent. The unit was not written for this project at all.
+    """
+
+    def images(self):
+        rom = bytearray(USA.read_bytes())
+        return driver_run.image_of(rom), driver_run.image_of(spcfast.apply(bytearray(rom)))
+
+    def unit(self, payload=PAYLOAD):
+        _stock, fast = self.images()
+        return driver_run.on_hardware(fast, payload, driver_run.DESTINATION)
+
+    def test_the_unit_carries_the_three_streams_the_stand_in_carries(self):
+        found = self.unit()
+
+        self.assertEqual(found.streams, (PAYLOAD[0::3], PAYLOAD[1::3], PAYLOAD[2::3]))
+
+    def test_it_reaches_the_same_bytes_as_the_stand_in(self):
+        _stock, fast = self.images()
+
+        found = driver_run.on_hardware(fast, PAYLOAD, driver_run.DESTINATION)
+
+        self.assertEqual(
+            found.streams, driver_run.deliver(fast, PAYLOAD, driver_run.DESTINATION).streams
+        )
+
+    def test_and_takes_the_same_number_of_handshakes_getting_there(self):
+        _stock, fast = self.images()
+
+        found = driver_run.on_hardware(fast, PAYLOAD, driver_run.DESTINATION)
+
+        self.assertEqual(
+            found.handshakes, driver_run.deliver(fast, PAYLOAD, driver_run.DESTINATION).handshakes
+        )
+
+    def test_and_the_same_number_of_instructions(self):
+        _stock, fast = self.images()
+
+        found = driver_run.on_hardware(fast, PAYLOAD, driver_run.DESTINATION)
+
+        self.assertEqual(
+            found.steps, driver_run.deliver(fast, PAYLOAD, driver_run.DESTINATION).steps
+        )
+
+    def test_only_the_unit_reports_cycles_at_all(self):
+        _stock, fast = self.images()
+
+        self.assertIsNone(driver_run.deliver(fast, PAYLOAD, driver_run.DESTINATION).cycles)
+        self.assertGreater(self.unit().cycles, 0)
+
+    def test_the_stock_loop_runs_on_the_unit_too(self):
+        stock, _fast = self.images()
+
+        found = driver_run.on_hardware(
+            stock, driver_run.spread(PAYLOAD), driver_run.DESTINATION, entry=driver_run.STOCK_LOOP
+        )
+
+        self.assertEqual(found.handshakes, len(PAYLOAD))
+
+    def test_and_costs_more_cycles_than_the_patched_one_for_the_same_bytes(self):
+        stock, _fast = self.images()
+
+        slow = driver_run.on_hardware(
+            stock, driver_run.spread(PAYLOAD), driver_run.DESTINATION, entry=driver_run.STOCK_LOOP
+        )
+
+        self.assertGreater(slow.cycles, self.unit().cycles * 3)
+
+    def test_a_counter_that_does_not_start_where_the_driver_expects_runs_away(self):
+        _stock, fast = self.images()
+
+        with self.assertRaises(driver_run.RunLimit):
+            driver_run.on_hardware(fast, PAYLOAD, driver_run.DESTINATION, counter=1)
+
+    def test_without_the_seeded_latch_the_first_acknowledgement_is_lost(self):
+        _stock, fast = self.images()
+
+        with self.assertRaises(driver_run.RunLimit):
+            driver_run.on_hardware(fast, PAYLOAD, driver_run.DESTINATION, unechoed=0x00)
+
+    def test_leaving_the_boot_window_on_changes_nothing_for_this_driver(self):
+        _stock, fast = self.images()
+
+        found = driver_run.on_hardware(fast, PAYLOAD, driver_run.DESTINATION, control=0x80)
+
+        self.assertEqual((found.streams, found.cycles), (self.unit().streams, self.unit().cycles))
+
+    def test_because_the_driver_never_reads_what_the_window_covers(self):
+        _stock, fast = self.images()
+
+        shown = driver_run.on_hardware(fast, PAYLOAD, driver_run.DESTINATION, control=0x80)
+
+        self.assertEqual(shown.handshakes, len(PAYLOAD) // 3)
+
+    def test_a_payload_longer_than_a_page_carries_over_on_the_unit_too(self):
+        payload = bytes(range(256)) * 3
+
+        found = self.unit(payload)
+
+        self.assertEqual(found.streams[0], payload[0::3])
+
+
+class ConsoleTest(unittest.TestCase):
+    def build(self, payload):
+        chip = driver_run.ssmp.Chip("s-smp")
+        chip.reset()
+        chip.space.write8(driver_run.PORT_BASE, driver_run.UNECHOED)
+        console = driver_run.Console(chip, payload)
+        console.offer()
+        return chip, console
+
+    def test_the_first_triple_is_where_the_driver_will_look_for_it(self):
+        chip, _console = self.build(bytes(range(6)))
+
+        self.assertEqual([chip.space.read8(at) for at in range(0xF5, 0xF8)], [0, 1, 2])
+
+    def test_the_counter_starts_where_the_driver_expects_it(self):
+        chip, _console = self.build(bytes(range(6)))
+
+        self.assertEqual(chip.space.read8(0xF4), driver_run.FIRST_COUNTER)
+
+    def test_an_acknowledgement_advances_to_the_next_triple(self):
+        chip, console = self.build(bytes(range(6)))
+
+        chip.space.write8(0xF4, 0x00)
+        console.watch()
+
+        self.assertEqual([chip.space.read8(at) for at in range(0xF5, 0xF8)], [3, 4, 5])
+
+    def test_a_latch_that_has_not_changed_is_not_an_acknowledgement(self):
+        _chip, console = self.build(bytes(range(6)))
+
+        self.assertFalse(console.watch())
+        self.assertEqual(console.handshakes, 0)
+
+    def test_a_payload_shorter_than_a_triple_is_padded_rather_than_read_past(self):
+        chip, _console = self.build(bytes([9]))
+
+        self.assertEqual([chip.space.read8(at) for at in range(0xF5, 0xF8)], [9, 0, 0])
+
+    def test_a_payload_that_runs_out_says_so(self):
+        chip, console = self.build(bytes(3))
+
+        chip.space.write8(0xF4, 0x00)
+        console.watch()
+
+        self.assertTrue(console.spent)
+
+    def test_the_counter_wraps_at_a_byte(self):
+        chip, console = self.build(bytes(3 * 300))
+        for step in range(300):
+            chip.space.write8(0xF4, step & 0xFF)
+            console.watch()
+
+        self.assertEqual(chip.space.read8(0xF4), 300 & 0xFF)
+
+    def test_the_driver_cannot_read_its_own_acknowledgement(self):
+        chip, _console = self.build(bytes(range(6)))
+
+        chip.space.write8(0xF4, 0x9E)
+
+        self.assertEqual(chip.space.read8(0xF4), driver_run.FIRST_COUNTER)
+
+
 class EntryTest(unittest.TestCase):
     @NEEDS_A_DUMP
     def test_a_run_from_the_command_line_reports_what_it_measured(self):

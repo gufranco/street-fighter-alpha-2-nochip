@@ -14,10 +14,13 @@ reproducible values rather than zeroes, because hardware does. Anything here tha
 relied on a register being zero without setting it was relying on the model being
 tidier than the machine, and now has to say what it wants.
 
-The audio mixer is pinned even though nothing here has used it yet. That is
-deliberate rather than speculative: the sample-upload and repeat-load patches
-change what reaches it, and a patch to audio code that is never played through a
-model of the thing that plays it has been checked for shape and not for effect.
+The audio mixer is played rather than merely pinned. The sample-upload and
+repeat-load patches change what reaches it, and a patch to audio code checked
+only against a listing has been checked for shape and not for effect. The whole
+audio unit is here for the same reason one step further out: the processor, the
+mixer and the boot ROM composed as the cartridge meets them, so the ports the
+upload driver talks through are the hardware's own rather than a stand-in
+written to the reading of the driver being tested.
 
 And nothing is loaded by file path any more. `load()` returns a model by the name
 it is published under, which reads the same way at the top of a module as the
@@ -25,8 +28,8 @@ file-path helper it replaces and does not need an import to be moved below a
 statement to work.
 
 The third consequence is the one that reaches whoever clones this. A submodule is
-a pinned commit, not content, so `git clone` on its own leaves six named but empty
-directories behind. Everything here imports through `load()`, so `load()` is where
+a pinned commit, not content, so `git clone` on its own leaves every named
+directory empty. Everything here imports through `load()`, so `load()` is where
 that has to be said, rather than leaving a bare import error to stand in for the
 explanation.
 """
@@ -47,6 +50,9 @@ PACKAGES = {
     "sdsp": "sony-s-dsp-python",
     "mapper": "snes-mapper-python",
     "romimage": "snes-rom-image-python",
+    "ssmp": "sony-s-smp-python",
+    "snesgfx": "snes-graphics-python",
+    "snesdriver": "snes-driver-python",
 }
 """The package each submodule provides, and the directory it lives in.
 
