@@ -1,7 +1,9 @@
 import itertools
 import sys
 from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -83,45 +85,56 @@ def rebuild(rom: bytes | bytearray, entries: list[Entry], gfx_size: int | None =
     return bytes(blob)
 
 
-def main() -> int:
-    if len(sys.argv) < 3:
-        print(
+def main(
+    argv: list[str] | None = None,
+    read: Callable[[Any], Any] | None = None,
+    say: Callable[..., None] = print,
+) -> int:
+    """The command line, with the arguments and the cartridge reader passed in.
+
+    Both are parameters so every branch, including the two refusals, can be
+    driven without a cartridge on the machine.
+    """
+    argv = sys.argv if argv is None else argv
+    read = dump.read if read is None else read
+    if len(argv) < 3:
+        say(
             "usage: sdd1map.py <tagged-rom> <source-rom> [output.bin]",
             file=sys.stderr,
         )
         return 2
 
-    tagged = dump.read(sys.argv[1])
-    rom = dump.read(sys.argv[2])
+    tagged = read(argv[1])
+    rom = read(argv[2])
     entries = build_map(tagged)
     if not entries:
-        print("no S-DD1 markers found", file=sys.stderr)
+        say("no S-DD1 markers found", file=sys.stderr)
         return 1
 
     declared = entries[-1].target
-    print(f"  streams        {len(entries):,}")
-    print(f"  source span    {entries[0].source:#09x} .. {entries[-1].source:#09x}")
-    print(f"  graphics bytes {declared:,} before the final stream")
+    say(f"  streams        {len(entries):,}")
+    say(f"  source span    {entries[0].source:#09x} .. {entries[-1].source:#09x}")
+    say(f"  graphics bytes {declared:,} before the final stream")
     modes: dict[int, int] = {}
     for entry in entries[:-1]:
         planes = sdd1.decompress(rom, entry.source, 2).bitplanes
         modes[planes] = modes.get(planes, 0) + 1
-    print(f"  bitplane modes {modes}")
+    say(f"  bitplane modes {modes}")
 
     report = audit(rom, entries)
     measured = report["measured"] or 1
-    print("\n  packing check, does each stream end where the next begins")
-    print(f"    packed  {report['packed']:>5}  {100 * report['packed'] / measured:5.2f}%")
-    print(f"    padded  {report['padded']:>5}  {100 * report['padded'] / measured:5.2f}%")
-    print(f"    overrun {report['overrun']:>5}  {100 * report['overrun'] / measured:5.2f}%")
+    say("\n  packing check, does each stream end where the next begins")
+    say(f"    packed  {report['packed']:>5}  {100 * report['packed'] / measured:5.2f}%")
+    say(f"    padded  {report['padded']:>5}  {100 * report['padded'] / measured:5.2f}%")
+    say(f"    overrun {report['overrun']:>5}  {100 * report['overrun'] / measured:5.2f}%")
 
-    if len(sys.argv) > 3:
+    if len(argv) > 3:
         complete = entries[:-1]
         blob = rebuild(rom, complete)
-        Path(sys.argv[3]).write_bytes(blob)
-        print(f"\n  wrote {sys.argv[3]} ({len(blob):,} bytes)")
-        print("  note: the final stream is omitted, its length is not recoverable")
-        print("        from the marker table alone")
+        Path(argv[3]).write_bytes(blob)
+        say(f"\n  wrote {argv[3]} ({len(blob):,} bytes)")
+        say("  note: the final stream is omitted, its length is not recoverable")
+        say("        from the marker table alone")
     return 0
 
 

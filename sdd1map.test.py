@@ -1,6 +1,7 @@
 import importlib.util
 import itertools
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, ClassVar, override
@@ -158,6 +159,68 @@ class RealMapTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             sdd1map.rebuild(self.retail, entries, gfx_size=64)
+
+
+class CommandTest(unittest.TestCase):
+    """The command line, driven without a cartridge."""
+
+    ROM = bytes(0x400000)
+
+    def run_with(self, argv: list[str], blob: bytes) -> tuple[int, list[str]]:
+        said: list[str] = []
+
+        def _read(where: Any) -> bytes:
+            return blob if str(where) == argv[1] else self.ROM
+
+        code = sdd1map.main(argv, read=_read, say=lambda *args, **_k: said.append(str(args[0])))
+        return code, said
+
+    def test_too_few_arguments_prints_the_usage(self) -> None:
+        code, said = self.run_with(["sdd1map.py", "one"], b"")
+
+        self.assertEqual((code, "usage" in said[0]), (2, True))
+
+    def test_a_blob_with_no_markers_is_refused(self) -> None:
+        code, said = self.run_with(["sdd1map.py", "tagged", "rom"], bytes(1024))
+
+        self.assertEqual((code, "no S-DD1 markers" in said[0]), (1, True))
+
+    def test_a_blob_with_markers_is_reported(self) -> None:
+        blob = tagged_blob([(0x100, 0), (0x300, 64), (0x700, 192)])
+
+        code, said = self.run_with(["sdd1map.py", "tagged", "rom"], blob)
+
+        self.assertEqual((code, "streams" in said[0]), (0, True))
+
+    def test_the_report_names_the_source_span(self) -> None:
+        blob = tagged_blob([(0x100, 0), (0x300, 64), (0x700, 192)])
+
+        _, said = self.run_with(["sdd1map.py", "tagged", "rom"], blob)
+
+        self.assertIn("0x0000100", "\n".join(said))
+
+    def test_it_counts_the_bitplane_mode_of_every_stream_but_the_last(self) -> None:
+        blob = tagged_blob([(0x100, 0), (0x300, 64), (0x700, 192)])
+
+        _, said = self.run_with(["sdd1map.py", "tagged", "rom"], blob)
+
+        self.assertIn("bitplane modes", "\n".join(said))
+
+    def test_a_third_argument_writes_the_rebuilt_graphics(self) -> None:
+        blob = tagged_blob([(0x100, 0), (0x300, 64), (0x700, 192)])
+        out = Path(tempfile.mkdtemp()) / "graphics.bin"
+
+        code, _said = self.run_with(["sdd1map.py", "tagged", "rom", str(out)], blob)
+
+        self.assertEqual((code, out.exists()), (0, True))
+
+    def test_and_says_that_the_final_stream_is_not_in_it(self) -> None:
+        blob = tagged_blob([(0x100, 0), (0x300, 64), (0x700, 192)])
+        out = Path(tempfile.mkdtemp()) / "graphics.bin"
+
+        _, said = self.run_with(["sdd1map.py", "tagged", "rom", str(out)], blob)
+
+        self.assertIn("final stream is omitted", "\n".join(said))
 
 
 if __name__ == "__main__":
