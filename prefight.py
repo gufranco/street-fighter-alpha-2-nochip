@@ -104,17 +104,22 @@ def apply(rom: bytes | bytearray) -> bytes:
     return bytes(patched)
 
 
-def report(rom: bytes | bytearray) -> None:
+def report(rom: bytes | bytearray, say: Callable[[str], None] = print) -> None:
+    """What the patch found in this cartridge, or that it found nothing.
+
+    The stream is a parameter so a run can be read back rather than watched.
+    """
     at = find_builder(rom)
     if at is None:
-        print("  no pre-fight table builder in this ROM")
+        say("  no pre-fight table builder in this ROM")
         return
-    print(f"  builder   ${WINDOW_FIRST_BANK + (at >> 16):02X}:{at & 0xFFFF:04X}  file ${at:06X}")
+    say(f"  builder   ${WINDOW_FIRST_BANK + (at >> 16):02X}:{at & 0xFFFF:04X}  file ${at:06X}")
     for site in find_callers(rom, at):
-        print(f"  caller    ${WINDOW_FIRST_BANK + (site >> 16):02X}:{site & 0xFFFF:04X}")
-    print(f"  routine   ${ROUTINE_ADDRESS:06X}  {len(ROUTINE)} bytes")
-    print(
-        f"  table     ${TABLE_ADDRESS:06X}  {TABLE_SIZE:,} bytes to work RAM ${TABLE_DESTINATION:04X}"
+        say(f"  caller    ${WINDOW_FIRST_BANK + (site >> 16):02X}:{site & 0xFFFF:04X}")
+    say(f"  routine   ${ROUTINE_ADDRESS:06X}  {len(ROUTINE)} bytes")
+    say(
+        f"  table     ${TABLE_ADDRESS:06X}  "
+        f"{TABLE_SIZE:,} bytes to work RAM ${TABLE_DESTINATION:04X}"
     )
 
 
@@ -135,7 +140,7 @@ def main(
         return 1
 
     rom = source.read_bytes()
-    report(rom)
+    report(rom, say)
     output.write_bytes(apply(rom))
     say(f"[done] {output} ({output.stat().st_size:,} bytes)")
     return 0
