@@ -33,7 +33,7 @@ ALPHA2 = ROOT / "roms" / "sfa2-usa-final.sfc"
 
 
 def docker_available() -> bool:
-    if not shutil.which("docker"):
+    if not shutil.which("docker"):  # pragma: no cover
         return False
     return (
         subprocess.run(["docker", "info"], capture_output=True, text=True, check=False).returncode

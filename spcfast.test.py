@@ -60,7 +60,9 @@ class DriverTest(unittest.TestCase):
         for at, data in spcfast.PATCH:
             if at <= offset < at + len(data):
                 return at, data
-        raise AssertionError(f"{offset:#08x} is not covered by the patch")
+        raise AssertionError(  # pragma: no cover
+            f"{offset:#08x} is not covered by the patch"
+        )
 
     def test_the_receive_loop_is_inside_the_patch(self) -> None:
         at, data = self.run_covering(spcfast.DRIVER_BASE + spcfast.RECEIVE_LOOP)
