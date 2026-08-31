@@ -59,8 +59,7 @@ def allocate(keys: list[tuple[int, int]]) -> list[int]:
         for index in broken:
             bank, addr = keys[index]
             found = _scan(table, bank, addr)
-            if found is None:
-                continue
+            assert found is not None, "a key that is placed always scans to something"
             del table[placed[index]]
             slot = _first_free(table, (found + 1) & 0xFFFF)
             table[slot] = bank

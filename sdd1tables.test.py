@@ -142,5 +142,97 @@ class RealMapTest(unittest.TestCase):
         self.assertGreater(exact / len(placed), 0.9)
 
 
+class RepairTest(unittest.TestCase):
+    """Placements the greedy pass gets wrong and the repair pass fixes."""
+
+    AMBIGUOUS: ClassVar[list[tuple[int, int]]] = [
+        (0xC1, 0x05),
+        (0xC1, 0x3E),
+        (0xC1, 0x26),
+        (0xC1, 0x2D),
+        (0xC2, 0x1B),
+        (0xC2, 0x11),
+        (0xC1, 0x11),
+        (0xC0, 0x20),
+        (0xC2, 0x12),
+        (0xC1, 0x0C),
+        (0xC2, 0x09),
+        (0xC2, 0x2A),
+        (0xC1, 0x0C),
+        (0xC1, 0x37),
+        (0xC1, 0x1A),
+    ]
+    """A key set crowded enough that the first placement leaves keys ambiguous.
+
+    Found by searching random key sets for one that reaches the repair pass. It
+    carries a repeated key, so the repair cannot succeed and the refusal comes
+    after the attempts rather than instead of them. Keys this crowded do not
+    occur in either cartridge, which is why neither the repair pass nor the
+    refusal is reachable from the real tables.
+    """
+
+    def test_a_key_set_the_repair_cannot_settle_is_refused(self) -> None:
+        with self.assertRaises(tables.PlacementError):
+            tables.allocate(self.AMBIGUOUS)
+
+    def test_the_refusal_says_the_scans_stayed_ambiguous(self) -> None:
+        with self.assertRaises(tables.PlacementError) as refusal:
+            tables.allocate(self.AMBIGUOUS)
+
+        self.assertIn("unambiguous", str(refusal.exception))
+
+    def test_two_keys_that_cannot_be_told_apart_are_refused(self) -> None:
+        with self.assertRaises(tables.PlacementError):
+            tables.allocate([(0xC1, 0x100), (0xC1, 0x100)])
+
+    def test_more_keys_than_slots_are_refused(self) -> None:
+        with self.assertRaises(tables.PlacementError):
+            tables.allocate([(0xC1, 0)] * (tables.SLOTS + 1))
+
+
+class VerifyTest(unittest.TestCase):
+    """Checking a placement rather than producing one."""
+
+    def test_a_placement_where_every_key_scans_correctly_is_accepted(self) -> None:
+        keys = [(0xC1, 0x100), (0xC2, 0x200)]
+
+        tables.verify(keys, tables.allocate(keys))
+
+    def test_two_keys_given_the_same_slot_are_refused(self) -> None:
+        with self.assertRaises(tables.PlacementError) as refusal:
+            tables.verify([(0xC1, 0x100), (0xC2, 0x200)], [0x100, 0x100])
+
+        self.assertIn("used twice", str(refusal.exception))
+
+    def test_a_key_that_scans_somewhere_else_is_refused(self) -> None:
+        with self.assertRaises(tables.PlacementError) as refusal:
+            tables.verify([(0xC1, 0x100), (0xC1, 0x200)], [0x300, 0x100])
+
+        self.assertIn("scans to", str(refusal.exception))
+
+
+class ScanTest(unittest.TestCase):
+    """Following the table from an address until the bank matches."""
+
+    def test_a_bank_that_is_in_the_table_is_found(self) -> None:
+        self.assertEqual(tables._scan({0x100: 0xC1}, 0xC1, 0x100), 0x100)
+
+    def test_a_bank_a_few_slots_along_is_found(self) -> None:
+        self.assertEqual(tables._scan({0x103: 0xC1}, 0xC1, 0x100), 0x103)
+
+    def test_a_bank_that_is_not_in_the_table_is_not_found(self) -> None:
+        self.assertIsNone(tables._scan({0x100: 0xC2}, 0xC1, 0x100))
+
+
+class FullTableTest(unittest.TestCase):
+    """A table with no slot left to give."""
+
+    def test_a_full_table_has_no_free_slot(self) -> None:
+        full = dict.fromkeys(range(tables.SLOTS), 0xC1)
+
+        with self.assertRaises(tables.PlacementError):
+            tables._first_free(full, 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
