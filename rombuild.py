@@ -1,5 +1,6 @@
 import sys
 from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -94,12 +95,22 @@ def subtract(regions: list[Region], taken: list[Region]) -> list[Region]:
     return out
 
 
-def reclaimed_regions(rom: bytes | bytearray, entries: list[Any]) -> list[Region]:
+def reclaimed_regions(
+    rom: bytes | bytearray,
+    entries: list[Any],
+    decode: Callable[..., Any] = sdd1.decompress,
+) -> list[Region]:
+    """The cartridge space each stream stops needing once it has been placed.
+
+    The decompressor is a parameter so the guard against a stream that consumes
+    nothing can be shown to fire. The real one always advances past its source,
+    so nothing else can drive that branch.
+    """
     spans: list[Region] = []
     for entry in entries:
         if entry.length is None:
             continue
-        consumed = sdd1.decompress(rom, entry.source, entry.length).end - READ_AHEAD
+        consumed = decode(rom, entry.source, entry.length).end - READ_AHEAD
         end = min(consumed, (entry.source | 0xFFFF) + 1)
         if end <= entry.source:
             continue
@@ -211,26 +222,37 @@ def build(
     return Result(bytes(image), destinations, tables, regions)
 
 
-def main() -> int:
-    if len(sys.argv) < 4:
-        print(
+def main(
+    argv: list[str] | None = None,
+    read: Callable[[Any], Any] | None = None,
+    say: Callable[..., None] = print,
+) -> int:
+    """The command line, with the arguments and the cartridge reader passed in.
+
+    Both are parameters so the refusal and a whole build can be driven without
+    a dump on the machine.
+    """
+    argv = sys.argv if argv is None else argv
+    read = dump.read if read is None else read
+    if len(argv) < 4:
+        say(
             "usage: rombuild.py <patched-rom> <tagged-rom> <output.sfc>",
             file=sys.stderr,
         )
         return 2
 
-    rom = dump.read(sys.argv[1])
-    entries = load_entries(dump.read(sys.argv[2]))
-    print(f"  streams   {len(entries):,}")
+    rom = read(argv[1])
+    entries = load_entries(read(argv[2]))
+    say(f"  streams   {len(entries):,}")
 
     result = build(rom, entries)
     graphics = sum(e.length for e in entries)
     banks = {result.destinations[e.index] >> 16 for e in entries}
-    print(f"  graphics  {graphics:,} bytes across {len(banks)} banks")
-    print(f"  image     {len(result.image):,} bytes ({len(result.image) * 8 // 1048576} Mbit)")
+    say(f"  graphics  {graphics:,} bytes across {len(banks)} banks")
+    say(f"  image     {len(result.image):,} bytes ({len(result.image) * 8 // 1048576} Mbit)")
 
-    Path(sys.argv[3]).write_bytes(result.image)
-    print(f"  wrote {sys.argv[3]}")
+    Path(argv[3]).write_bytes(result.image)
+    say(f"  wrote {argv[3]}")
     return 0
 
 
