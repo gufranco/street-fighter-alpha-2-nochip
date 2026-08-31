@@ -1,5 +1,6 @@
 import importlib.util
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -170,6 +171,156 @@ class VerdictTest(unittest.TestCase):
         )
 
         self.assertFalse(tour.passed(found, summary, roster=1, budget=1000))
+
+
+class ShellOutTest(unittest.TestCase):
+    """The one step that reaches for a container, with the reaching passed in."""
+
+    def test_it_asks_for_as_many_frames_as_the_roster_and_budget_need(self) -> None:
+        asked: list[Any] = []
+
+        tour.run(
+            tour.ROOT / "build" / "all" / "probe.sfc",
+            "-2",
+            3,
+            100,
+            execute=lambda command, **_rest: asked.append(command),
+        )
+
+        self.assertIn("300", asked[0])
+
+    def test_it_returns_whatever_the_pass_wrote(self) -> None:
+        line = "RESULT load=ok frames=300\n"
+
+        def _write(_command: Any, stdout: Any = None, **_rest: Any) -> Any:
+            stdout.write(line.encode())
+            return None
+
+        found = tour.run(tour.ROOT / "build" / "all" / "probe.sfc", "-2", 3, 100, execute=_write)
+
+        self.assertEqual(found, line)
+
+
+class ReportTest(unittest.TestCase):
+    """One block about one image."""
+
+    @staticmethod
+    def moving(fighter: int) -> dict[str, Any]:
+        return {"fighter": fighter, "main": {"a", "b"}, "nmi": {"c", "d"}, "bad": [], "ticks": 9}
+
+    def test_a_fighter_whose_state_moved_is_reported_as_ok(self) -> None:
+        said: list[str] = []
+
+        tour.report(
+            "probe", [self.moving(0)], {"load": "ok", "frames": 1, "ok": 1, "bad": 0}, said.append
+        )
+
+        self.assertIn("ok", said[1])
+
+    def test_a_fighter_whose_state_never_moved_is_reported_as_stalled(self) -> None:
+        said: list[str] = []
+        stuck = {"fighter": 0, "main": {"a"}, "nmi": {"c"}, "bad": [], "ticks": 9}
+
+        tour.report("probe", [stuck], {"load": "ok", "frames": 1, "ok": 1, "bad": 0}, said.append)
+
+        self.assertIn("STALLED", said[1])
+
+    def test_the_totals_close_the_block(self) -> None:
+        said: list[str] = []
+
+        tour.report("probe", [], {"load": "ok", "frames": 7, "ok": 1, "bad": 0}, said.append)
+
+        self.assertIn("frames=7", said[-1])
+
+
+class CommandTest(unittest.TestCase):
+    """The verdict over a set of images, driven against recorded logs."""
+
+    @staticmethod
+    def healthy(roster: int, budget: int) -> str:
+        lines = []
+        for fighter in range(roster):
+            lines.append(f"TOUR fighter={fighter} frame={fighter * budget}")
+            for step in range(2):
+                frame = fighter * budget + step
+                lines.append(
+                    f"TICK frame={frame} main={step:02x} nmi={step + 16:02x} "
+                    "ready=00 busy=00 mode=00 port0=00 spc=0400"
+                )
+        lines.append("BLOCKS ok=10 bad=0")
+        lines.append(f"RESULT load=ok frames={roster * budget}")
+        return log(lines)
+
+    def run_with(self, text: str, stems: list[str], argv: list[str]) -> tuple[int, list[str]]:
+        said: list[str] = []
+        code = tour.main(
+            argv,
+            images=[tour.IMAGES / f"{stem}.sfc" for stem in stems],
+            tour=lambda *_a: text,
+            say=said.append,
+        )
+        return code, said
+
+    def test_an_image_where_every_fighter_moved_passes(self) -> None:
+        code, said = self.run_with(
+            self.healthy(2, 100), ["jp-both-cart"], ["tour_audio.py", "both-cart", "2", "100"]
+        )
+
+        self.assertEqual((code, "0 failing" in said[-1]), (0, True))
+
+    def test_an_image_where_nothing_moved_fails(self) -> None:
+        code, said = self.run_with(
+            "RESULT load=ok frames=200\n",
+            ["jp-both-cart"],
+            ["tour_audio.py", "both-cart", "2", "100"],
+        )
+
+        self.assertEqual((code, "FAIL jp-both-cart" in "\n".join(said)), (1, True))
+
+    def test_a_bypass_image_is_never_toured(self) -> None:
+        code, said = self.run_with(
+            self.healthy(2, 100), ["jp-both-bypass"], ["tour_audio.py", "both", "2", "100"]
+        )
+
+        self.assertEqual((code, "0 failing" in said[-1]), (0, True))
+
+    def test_an_image_whose_name_does_not_match_is_skipped(self) -> None:
+        _, said = self.run_with(
+            self.healthy(2, 100), ["usa-base-free"], ["tour_audio.py", "both-cart", "2", "100"]
+        )
+
+        self.assertEqual(said[-1], "  0 failing")
+
+    def recorder(self, seen: list[str], text: str) -> Callable[..., str]:
+        def _tour(_image: Any, mapping: str, *_rest: Any) -> str:
+            seen.append(mapping)
+            return text
+
+        return _tour
+
+    def test_a_free_image_is_read_through_the_windowed_map(self) -> None:
+        seen: list[str] = []
+
+        tour.main(
+            ["tour_audio.py", "both-free", "2", "100"],
+            images=[tour.IMAGES / "jp-both-free.sfc"],
+            tour=self.recorder(seen, self.healthy(2, 100)),
+            say=lambda _l: None,
+        )
+
+        self.assertEqual(seen, ["-2"])
+
+    def test_a_cartridge_image_is_read_through_the_cartridge_map(self) -> None:
+        seen: list[str] = []
+
+        tour.main(
+            ["tour_audio.py", "both-cart", "2", "100"],
+            images=[tour.IMAGES / "jp-both-cart.sfc"],
+            tour=self.recorder(seen, self.healthy(2, 100)),
+            say=lambda _l: None,
+        )
+
+        self.assertEqual(seen, ["-1"])
 
 
 if __name__ == "__main__":

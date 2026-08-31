@@ -1,6 +1,7 @@
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -19,11 +20,22 @@ BLOCKS = re.compile(r"^BLOCKS ok=(\d+) bad=(\d+)")
 RESULT = re.compile(r"^RESULT load=(\w+) frames=(\d+)")
 
 
-def run(image: Path, mapping: str, roster: int, budget: int) -> str:
+def run(
+    image: Path,
+    mapping: str,
+    roster: int,
+    budget: int,
+    execute: Callable[..., Any] = subprocess.run,
+) -> str:
+    """Tour one image and return the log the emulator wrote.
+
+    The reaching out is a parameter so the parsing and the verdict, which are
+    the parts worth testing, can be driven without a container.
+    """
     LOGS.mkdir(parents=True, exist_ok=True)
     log = LOGS / f"tour-{image.stem}.txt"
     with log.open("wb") as handle:
-        subprocess.run(
+        execute(
             [
                 "docker",
                 "run",
@@ -102,39 +114,54 @@ def passed(found: list[dict[str, Any]], summary: dict[str, Any], roster: int, bu
     )
 
 
-def report(name: str, found: list[dict[str, Any]], summary: dict[str, Any]) -> None:
-    print(f"  {name}")
+def report(
+    name: str,
+    found: list[dict[str, Any]],
+    summary: dict[str, Any],
+    say: Callable[[str], None] = print,
+) -> None:
+    """One block about one image: a line per fighter, then the totals."""
+    say(f"  {name}")
     for slot in found:
         moving = len(slot["main"]) > 1 and len(slot["nmi"]) > 1
-        print(
+        say(
             f"    fighter {slot['fighter']:2d}  ticks={slot['ticks']:4d}  "
             f"main states={len(slot['main']):3d}  frames drawn={len(slot['nmi']):3d}  "
             f"bad blocks={len(slot['bad']):2d}  {'ok' if moving else 'STALLED'}"
         )
-    print(
+    say(
         f"    load={summary['load']} frames={summary['frames']} "
-        f"blocks ok={summary['ok']} bad={summary['bad']}",
-        flush=True,
+        f"blocks ok={summary['ok']} bad={summary['bad']}"
     )
 
 
-def main(argv: list[str]) -> int:
+def main(
+    argv: list[str],
+    images: list[Path] | None = None,
+    tour: Callable[..., str] = run,
+    say: Callable[[str], None] = print,
+) -> int:
+    """Tour every matching image and report which of them stalled.
+
+    The image list and the touring are parameters, so the verdict can be driven
+    without a container and without a build on disk.
+    """
     wanted = argv[1] if len(argv) > 1 else "both-cart"
     roster = int(argv[2]) if len(argv) > 2 else ROSTER
     budget = int(argv[3]) if len(argv) > 3 else BUDGET
     failed = []
-    for image in sorted(IMAGES.glob("*.sfc")):
+    for image in sorted(IMAGES.glob("*.sfc")) if images is None else images:
         if wanted not in image.stem or image.stem.endswith("-bypass"):
             continue
         mapping = "-2" if image.stem.endswith("-free") else "-1"
-        found, summary = parse(run(image, mapping, roster, budget), roster, budget)
-        report(image.stem, found, summary)
+        found, summary = parse(tour(image, mapping, roster, budget), roster, budget)
+        report(image.stem, found, summary, say)
         if not passed(found, summary, roster, budget):
             failed.append((image.stem, stalled(found), summary["bad"]))
-    print()
+    say("")
     for name, halted, bad in failed:
-        print(f"    FAIL {name}: stalled {halted}, bad blocks {bad}")
-    print(f"  {len(failed)} failing")
+        say(f"    FAIL {name}: stalled {halted}, bad blocks {bad}")
+    say(f"  {len(failed)} failing")
     return 1 if failed else 0
 
 
