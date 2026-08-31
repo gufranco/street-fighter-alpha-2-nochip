@@ -1,6 +1,7 @@
 import sys
 import zlib
 from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -72,10 +73,19 @@ def find_streams(
     start: int = 0,
     stop: int | None = None,
     progress: Any = None,
+    probe_bits: int = PROBE_BITS,
+    confirm_bits: int = CONFIRM_BITS,
 ) -> list[Any]:
+    """Every offset in the source whose decompressed output appears in the reference.
+
+    Two bitmaps narrow the search before anything is decompressed twice. Their
+    widths are parameters because they are a tuning knob: a narrow one reports
+    more false positives, which the search then has to reject by looking the
+    output up in the reference for real.
+    """
     stop = len(source) if stop is None else stop
-    probe_map = build_bitmap(reference, PROBE_LENGTH, PROBE_BITS)
-    confirm_map = build_bitmap(reference, CONFIRM_LENGTH, CONFIRM_BITS)
+    probe_map = build_bitmap(reference, PROBE_LENGTH, probe_bits)
+    confirm_map = build_bitmap(reference, CONFIRM_LENGTH, confirm_bits)
     decompress = sdd1.decompress
     truncated = sdd1.TruncatedStream
     hits: list[Any] = []
@@ -89,7 +99,7 @@ def find_streams(
             continue
         if not is_distinctive(head, MIN_PROBE_DISTINCT):
             continue
-        if not probe(probe_map, head, PROBE_BITS):
+        if not probe(probe_map, head, probe_bits):
             continue
         try:
             blob = decompress(source, offset, CONFIRM_LENGTH).data
@@ -97,7 +107,7 @@ def find_streams(
             continue
         if not is_distinctive(blob):
             continue
-        if not probe(confirm_map, blob, CONFIRM_BITS):
+        if not probe(confirm_map, blob, confirm_bits):
             continue
         target = reference.find(blob)
         if target < 0:
@@ -124,42 +134,53 @@ def chains(hits: list[Any], tolerance: int = 2) -> list[Any]:
     return runs
 
 
-def main() -> int:
-    if len(sys.argv) < 3:
-        print(
+def main(
+    argv: list[str] | None = None,
+    read: Callable[[Any], Any] | None = None,
+    say: Callable[..., None] = print,
+) -> int:
+    """Find every compressed stream in one cartridge whose output is in another.
+
+    The arguments and the cartridge reader are parameters, so the refusal and a
+    whole scan can be driven without either dump on the machine.
+    """
+    argv = sys.argv if argv is None else argv
+    read = dump.read if read is None else read
+    if len(argv) < 3:
+        say(
             "usage: sdd1find.py <source-rom> <reference-rom> [start] [stop]",
             file=sys.stderr,
         )
         return 2
 
-    source = dump.read(sys.argv[1])
-    reference = dump.read(sys.argv[2])
-    start = int(sys.argv[3], 0) if len(sys.argv) > 3 else 0
-    stop = int(sys.argv[4], 0) if len(sys.argv) > 4 else len(source)
+    source = read(argv[1])
+    reference = read(argv[2])
+    start = int(argv[3], 0) if len(argv) > 3 else 0
+    stop = int(argv[4], 0) if len(argv) > 4 else len(source)
 
-    print(f"  source    {sys.argv[1]} {len(source):,} bytes")
-    print(f"  reference {sys.argv[2]} {len(reference):,} bytes")
-    print(f"  scanning {start:#x}..{stop:#x}", flush=True)
+    say(f"  source    {argv[1]} {len(source):,} bytes")
+    say(f"  reference {argv[2]} {len(reference):,} bytes")
+    say(f"  scanning {start:#x}..{stop:#x}")
 
     def report(offset: int, found: int) -> None:
-        print(f"    at {offset:#09x}  hits so far {found}", flush=True)
+        say(f"    at {offset:#09x}  hits so far {found}")
 
     hits = find_streams(source, reference, start, stop, progress=report)
-    print(f"\n  confirmed streams: {len(hits)}")
+    say(f"\n  confirmed streams: {len(hits)}")
 
     longest = sorted(hits, key=lambda hit: -hit.length)[:20]
-    print("\n  deepest confirmations")
+    say("\n  deepest confirmations")
     for hit in longest:
-        print(
+        say(
             f"    source {hit.source:#09x} -> reference {hit.target:#09x}  "
             f"{hit.length} bytes verbatim"
         )
 
     runs = [run for run in chains(hits) if len(run) > 1]
     runs.sort(key=len, reverse=True)
-    print(f"\n  contiguous chains of streams: {len(runs)}")
+    say(f"\n  contiguous chains of streams: {len(runs)}")
     for run in runs[:10]:
-        print(
+        say(
             f"    {len(run):>4} streams  source {run[0].source:#09x} "
             f"-> reference {run[0].target:#09x}..{run[-1].target + run[-1].length:#09x}"
         )
