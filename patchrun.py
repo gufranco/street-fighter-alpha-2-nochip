@@ -102,12 +102,20 @@ def translate(
 
 
 def walk(
-    memory: Any, entries: list[Any], expected: dict[int, int], say: Callable[[str], None]
+    memory: Any,
+    entries: list[Any],
+    expected: dict[int, int],
+    say: Callable[[str], None],
+    run: Callable[[Any, int], Any] = translate,
 ) -> int:
-    """Every stream translated on the processor, and where it disagreed."""
+    """Every stream translated on the processor, and where it disagreed.
+
+    The translation is a parameter so the reporting can be driven without an
+    assembled image and without running the processor over the whole table.
+    """
     failures = 0
     for entry in entries:
-        outcome = translate(memory, entry.source)
+        outcome = run(memory, entry.source)
         if outcome.destination != expected[entry.index]:
             failures += 1
             if failures <= EXAMPLE_LIMIT:

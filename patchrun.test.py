@@ -261,5 +261,84 @@ class EntryTest(unittest.TestCase):
         self.assertIn("executed", said[-1])
 
 
+class MemoryTest(unittest.TestCase):
+    """What the processor sees at each kind of address."""
+
+    def memory(self) -> Any:
+        return patchrun.SnesMemory(bytes(rombuild.IMAGE_SIZE))
+
+    def test_a_work_ram_bank_reads_from_ram(self) -> None:
+        memory = self.memory()
+        memory.write8(0x7E1234, 0xAB)
+
+        self.assertEqual(memory.read8(0x7E1234), 0xAB)
+
+    def test_the_second_work_ram_bank_does_too(self) -> None:
+        memory = self.memory()
+        memory.write8(0x7F1234, 0xCD)
+
+        self.assertEqual(memory.read8(0x7F1234), 0xCD)
+
+    def test_a_work_ram_address_never_written_reads_as_zero(self) -> None:
+        self.assertEqual(self.memory().read8(0x7E1234), 0x00)
+
+    def test_the_low_half_of_a_low_bank_is_ram_rather_than_cartridge(self) -> None:
+        memory = self.memory()
+        memory.write8(0x001234, 0xEF)
+
+        self.assertEqual(memory.read8(0x001234), 0xEF)
+
+    def test_the_high_half_of_a_low_bank_is_cartridge(self) -> None:
+        self.assertEqual(self.memory().read8(0x008000), 0x00)
+
+
+class WalkTest(unittest.TestCase):
+    """Reporting where the processor disagreed with the allocation.
+
+    The translation is passed in, so the reporting can be driven without an
+    assembled image and without running the processor over the whole table.
+    """
+
+    class Entry:
+        def __init__(self, index: int, source: int) -> None:
+            self.index, self.source = index, source
+
+    def walk_with(
+        self, outcomes: dict[int, tuple[int, int]], want: dict[int, int]
+    ) -> tuple[list[str], int]:
+        said: list[str] = []
+        entries = [self.Entry(index, 0x100000 + index) for index in want]
+
+        def _translate(_memory: Any, source: int) -> Any:
+            destination, dmap = outcomes[source - 0x100000]
+            return patchrun.Outcome(destination, dmap, None)
+
+        return said, patchrun.walk(None, entries, want, said.append, _translate)
+
+    def test_a_stream_that_lands_where_it_was_allocated_is_not_a_failure(self) -> None:
+        said, failures = self.walk_with({0: (0x0C4000, 0x00)}, {0: 0x0C4000})
+
+        self.assertEqual((failures, said), (0, []))
+
+    def test_a_stream_that_lands_elsewhere_is_reported(self) -> None:
+        said, failures = self.walk_with({0: (0x0C5000, 0x00)}, {0: 0x0C4000})
+
+        self.assertEqual((failures, "got 0x0c5000" in said[0]), (1, True))
+
+    def test_a_stream_that_kept_the_fixed_address_bit_is_reported(self) -> None:
+        said, failures = self.walk_with({0: (0x0C4000, patchrun.FIXED_ADDRESS_BIT)}, {0: 0x0C4000})
+
+        self.assertEqual((failures, "fixed-address bit" in said[0]), (1, True))
+
+    def test_only_the_first_few_wrong_destinations_are_named(self) -> None:
+        count = patchrun.EXAMPLE_LIMIT + 3
+        outcomes = dict.fromkeys(range(count), (806912, 0))
+        want = dict.fromkeys(range(count), 0x0C4000)
+
+        said, failures = self.walk_with(outcomes, want)
+
+        self.assertEqual((failures, len(said)), (count, patchrun.EXAMPLE_LIMIT))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
