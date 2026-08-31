@@ -1,6 +1,7 @@
 import importlib.util
 import sys
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -147,6 +148,102 @@ class NamingTest(unittest.TestCase):
     def test_a_name_belonging_to_no_region_is_refused_rather_than_guessed(self) -> None:
         with self.assertRaises(ValueError):
             verify_image.region_of("something-else.sfc")
+
+
+class CommandTest(unittest.TestCase):
+    """The two failures the check reports, driven without an assembled image."""
+
+    RETAIL = bytes(0x400000)
+
+    def run_with(self, image: bytearray, streams: list[tuple[int, int]]) -> tuple[int, list[str]]:
+        said: list[str] = []
+
+        def _read(where: Any) -> Any:
+            return image if "jp-" in Path(where).name else self.RETAIL
+
+        code = verify_image.main(
+            ["verify_image.py", "jp-base-free.sfc"],
+            read=_read,
+            streams=streams,
+            say=said.append,
+        )
+        return code, said
+
+    def placed(self, source: int, length: int, at: int = 0x0C4000) -> bytearray:
+        image = _image()
+        _entry(image, BANKS, source & 0xFFFF, source, at)
+        want = verify_image.sdd1.decompress(self.RETAIL, source, length).data
+        for offset, value in enumerate(want):
+            _write(image, BANKS, (at + offset) >> 16, (at + offset) & 0xFFFF, value)
+        return image
+
+    def test_a_stream_that_is_where_the_table_says_passes(self) -> None:
+        code, said = self.run_with(self.placed(0x19104C, 16), [(0x19104C, 16)])
+
+        self.assertEqual((code, "wrong: 0" in "\n".join(said)), (0, True))
+
+    def test_a_lookup_that_resolves_nowhere_fails(self) -> None:
+        code, said = self.run_with(_image(), [(0x19104C, 16)])
+
+        self.assertEqual((code, "unresolved lookups: 1" in "\n".join(said)), (1, True))
+
+    def test_an_unresolved_lookup_is_named(self) -> None:
+        _, said = self.run_with(_image(), [(0x19104C, 16)])
+
+        self.assertIn("0x19104c", "\n".join(said))
+
+    def test_bytes_that_do_not_match_fail(self) -> None:
+        image = self.placed(0x19104C, 16)
+        _write(image, BANKS, 0x0C, 0x4003, 0xFF)
+
+        code, said = self.run_with(image, [(0x19104C, 16)])
+
+        self.assertEqual((code, "first bad byte 3" in "\n".join(said)), (1, True))
+
+    def test_only_the_first_ten_unresolved_lookups_are_listed(self) -> None:
+        many = [(0x190000 + n * 0x100, 16) for n in range(15)]
+
+        _, said = self.run_with(_image(), many)
+
+        self.assertEqual(len([one for one in said if one.startswith("     0x")]), 10)
+
+    @staticmethod
+    def recorder(applied: list[Any]) -> Callable[[Any], Any]:
+        def _apply(rom: Any) -> Any:
+            applied.append(rom)
+            return rom
+
+        return _apply
+
+    def test_an_image_naming_the_game_fixes_has_them_applied_first(self) -> None:
+        applied: list[Any] = []
+
+        verify_image.main(
+            ["verify_image.py", "jp-both-free.sfc"],
+            read=lambda where: _image() if "jp-both" in Path(where).name else self.RETAIL,
+            streams=[],
+            say=lambda _l: None,
+            fixes=self.recorder(applied),
+        )
+
+        self.assertEqual(len(applied), 1)
+
+    def test_an_image_that_does_not_name_them_leaves_the_cartridge_alone(self) -> None:
+        applied: list[Any] = []
+
+        verify_image.main(
+            ["verify_image.py", "jp-base-free.sfc"],
+            read=lambda where: _image() if "jp-base" in Path(where).name else self.RETAIL,
+            streams=[],
+            say=lambda _l: None,
+            fixes=self.recorder(applied),
+        )
+
+        self.assertEqual(applied, [])
+
+    def test_an_image_belonging_to_neither_region_is_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            verify_image.main(["verify_image.py", "mystery.sfc"], say=lambda _l: None)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -64,13 +65,28 @@ def region_of(path: str | Path) -> tuple[Any, Path]:
     raise ValueError(f"cannot tell which region {name} belongs to")
 
 
-def main(argv: list[str]) -> int:
+def main(
+    argv: list[str],
+    read: Callable[[Any], Any] | None = None,
+    streams: list[tuple[int, int]] | None = None,
+    say: Callable[[str], None] = print,
+    fixes: Callable[[Any], Any] | None = None,
+) -> int:
+    """Check that every stream in the table really is where the image says it is.
+
+    The cartridge reader and the table are parameters, so both failures, a
+    lookup that resolves nowhere and bytes that do not match, can be driven
+    without an assembled image on the machine.
+    """
+    read = dump.read if read is None else read
+    fixes = gamefixes.apply if fixes is None else fixes
     image_path = Path(argv[1]) if len(argv) > 1 else ROOT / "build" / "all" / "jp-both-free.sfc"
-    streams, retail_path = region_of(image_path)
-    retail = dump.read(retail_path)
+    from_table, retail_path = region_of(image_path)
+    streams = from_table if streams is None else streams
+    retail = read(retail_path)
     if carries_game_fixes(image_path):
-        retail = gamefixes.apply(retail)
-    image = dump.read(image_path)
+        retail = fixes(retail)
+    image = read(image_path)
     banks = len(image) // mapper.BANK
 
     wrong = []
@@ -89,13 +105,13 @@ def main(argv: list[str]) -> int:
             first = next(i for i, (a, b) in enumerate(zip(got, want, strict=True)) if a != b)
             wrong.append((source, destination, first))
 
-    print(f"  image {image_path.name}, {len(streams):,} streams")
-    print(f"  unresolved lookups: {len(unresolved)}")
+    say(f"  image {image_path.name}, {len(streams):,} streams")
+    say(f"  unresolved lookups: {len(unresolved)}")
     for source in unresolved[:10]:
-        print(f"     {source:#08x}")
-    print(f"  streams whose bytes in the image are wrong: {len(wrong)}")
+        say(f"     {source:#08x}")
+    say(f"  streams whose bytes in the image are wrong: {len(wrong)}")
     for source, destination, first in wrong[:10]:
-        print(f"     {source:#08x} at {destination:#08x}, first bad byte {first}")
+        say(f"     {source:#08x} at {destination:#08x}, first bad byte {first}")
     return 1 if wrong or unresolved else 0
 
 
