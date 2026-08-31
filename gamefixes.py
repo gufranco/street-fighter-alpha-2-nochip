@@ -1,13 +1,16 @@
 import importlib.util
 import sys
 from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 
 
-def _load(name):
+def _load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -226,20 +229,20 @@ ABSENT = "absent"
 WINDOW_FIRST_BANK = 0xC0
 
 
-def long_to_file(address):
+def long_to_file(address: int) -> int:
     bank = ((address >> 16) & 0xFF) - WINDOW_FIRST_BANK
     return (bank << 16) | (address & 0xFFFF)
 
 
-def call_run(target):
+def call_run(target: int) -> bytes:
     return bytes([JSL, target & 0xFF, (target >> 8) & 0xFF, (target >> 16) & 0xFF, RTS])
 
 
-def retired_run(target):
+def retired_run(target: int) -> bytes:
     return bytes([RTS]) + call_run(target)[1:]
 
 
-def empty_call_sites(rom, call):
+def empty_call_sites(rom: bytes | bytearray, call: EmptyCall) -> list[int]:
     run = call_run(call.target)
     found, position = [], rom.find(run)
     while position != -1:
@@ -253,7 +256,7 @@ def empty_call_sites(rom, call):
     return found
 
 
-def retired_sites(rom, call):
+def retired_sites(rom: bytes | bytearray, call: EmptyCall) -> list[int]:
     run = retired_run(call.target)
     found, position = [], rom.find(run)
     while position != -1:
@@ -262,7 +265,7 @@ def retired_sites(rom, call):
     return found
 
 
-def locate(rom, run):
+def locate(rom: bytes | bytearray, run: bytes) -> int | None:
     first = rom.find(run)
     if first == -1:
         return None
@@ -271,7 +274,7 @@ def locate(rom, run):
     return first
 
 
-def survey(rom):
+def survey(rom: bytes | bytearray) -> dict[str, str]:
     found = {}
     for fix in FIXES:
         if locate(rom, fix.stock) is not None:
@@ -290,7 +293,7 @@ def survey(rom):
     return found
 
 
-def changed_bytes(rom):
+def changed_bytes(rom: bytes | bytearray) -> int:
     total = 0
     for fix in FIXES:
         if locate(rom, fix.stock) is None:
@@ -303,7 +306,7 @@ def changed_bytes(rom):
     return total
 
 
-def apply(rom):
+def apply(rom: bytes | bytearray) -> bytes:
     found = survey(rom)
     if all(state == ABSENT for state in found.values()):
         raise ValueError("this ROM carries none of the sites these fixes name")
@@ -315,14 +318,16 @@ def apply(rom):
         if found[fix.name] != APPLIED:
             continue
         at = locate(patched, fix.stock)
+        if at is None:
+            raise ValueError(f"the run {fix.name} names was there at survey and is not now")
         patched[at : at + len(fix.stock)] = fix.patched
     for call in EMPTY_CALLS:
         for at in empty_call_sites(patched, call):
             patched[at] = RTS
-    return spcfast.write_checksum(patched)
+    return bytes(spcfast.write_checksum(patched))
 
 
-def report(rom, say=print):
+def report(rom: bytes | bytearray, say: Callable[[str], None] = print) -> None:
     found = survey(rom)
     for fix in FIXES:
         at = locate(rom, fix.stock) or locate(rom, fix.patched)
@@ -334,7 +339,11 @@ def report(rom, say=print):
     say(f"  {changed_bytes(rom)} bytes to change across {len(FIXES) + len(EMPTY_CALLS)} entries")
 
 
-def main(argv, say=print, complain=None):
+def main(
+    argv: list[str],
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     complain = say if complain is None else complain
     if len(argv) != 3:

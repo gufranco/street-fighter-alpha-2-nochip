@@ -97,7 +97,7 @@ class Chain:
         self.reach = reach
         self.fault = fault
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Chain at {self.start:#06x}, {self.blocks} blocks, {self.fault or 'ends'}>"
 
 
@@ -115,7 +115,7 @@ class Fault:
     def __hash__(self):
         return hash((self.sample, self.fault, self.at))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Fault sample {self.sample} at {self.at:#06x}: {self.fault}>"
 
 
@@ -250,7 +250,7 @@ def report(ram, directory, used):
     return lines
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     if len(argv) < 2:
         print("usage: sample_audit.py <apu-ram-image> <directory-page> [sample ...]")
         return 2

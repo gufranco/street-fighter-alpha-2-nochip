@@ -71,7 +71,7 @@ class Finding:
             return self.line
         return f"{self.line}\n         {self.advice}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Finding {self.name} {'ok' if self.ok else 'not ok'}>"
 
 

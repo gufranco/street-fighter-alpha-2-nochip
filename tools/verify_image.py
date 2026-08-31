@@ -1,6 +1,7 @@
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -14,8 +15,9 @@ sdd1 = hardware.load("sdd1")
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load(name):
+def load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -60,7 +62,7 @@ def region_of(path):
     raise ValueError(f"cannot tell which region {name} belongs to")
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     image_path = Path(argv[1]) if len(argv) > 1 else ROOT / "build" / "all" / "jp-both-free.sfc"
     streams, retail_path = region_of(image_path)
     retail = dump.read(retail_path)

@@ -1,12 +1,14 @@
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 
 
-def _load(name):
+def _load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -101,7 +103,7 @@ def checksum(rom):
     return (sum(zeroed) + CHECKSUM_FIELD_SUM) & 0xFFFF
 
 
-def write_checksum(rom):
+def write_checksum(rom: bytes | bytearray) -> bytes:
     stamped = bytearray(rom)
     value = checksum(stamped)
     complement = value ^ 0xFFFF
@@ -128,11 +130,11 @@ def is_stock(rom):
     return all(rom[at : at + len(want)] == want for at, want in STOCK_PROBE)
 
 
-def is_patched(rom):
+def is_patched(rom: bytes | bytearray) -> bool:
     return all(rom[at : at + len(data)] == data for at, data in runs_for(rom))
 
 
-def apply(rom):
+def apply(rom: bytes | bytearray) -> bytes:
     if is_patched(rom):
         return bytes(rom)
     if not is_stock(rom):

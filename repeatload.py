@@ -1,12 +1,15 @@
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 
 
-def _load(name):
+def _load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -51,17 +54,17 @@ ROUTINE = bytes.fromhex(
 )
 
 
-def hook():
+def hook() -> bytes:
     return bytes([JSR, ROUTINE_ADDRESS & 0xFF, ROUTINE_ADDRESS >> 8])
 
 
-def is_patched(rom):
+def is_patched(rom: bytes | bytearray) -> bool:
     if rom[HOOK_FILE : HOOK_FILE + len(REPLACED)] != hook():
         return False
     return rom[FILLER_FILE : FILLER_FILE + len(ROUTINE)] == ROUTINE
 
 
-def apply(rom):
+def apply(rom: bytes | bytearray) -> bytes:
     if is_patched(rom):
         return bytes(rom)
     if rom[HOOK_FILE : HOOK_FILE + len(REPLACED)] != REPLACED:
@@ -72,10 +75,10 @@ def apply(rom):
     patched = bytearray(rom)
     patched[FILLER_FILE : FILLER_FILE + len(ROUTINE)] = ROUTINE
     patched[HOOK_FILE : HOOK_FILE + len(REPLACED)] = hook()
-    return spcfast.write_checksum(patched)
+    return bytes(spcfast.write_checksum(patched))
 
 
-def report(rom, say=print):
+def report(rom: bytes | bytearray, say: Callable[[str], None] = print) -> None:
     state = "already applied" if is_patched(rom) else "ready"
     say(f"  hook      $C7:{HOOK_FILE & 0xFFFF:04X}  {REPLACED.hex(' ')} -> {hook().hex(' ')}")
     say(f"  routine   $C7:{ROUTINE_ADDRESS:04X}  {len(ROUTINE)} bytes")
@@ -83,7 +86,11 @@ def report(rom, say=print):
     say(f"  state     {state}")
 
 
-def main(argv, say=print, complain=None):
+def main(
+    argv: list[str],
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     complain = say if complain is None else complain
     if len(argv) != 3:

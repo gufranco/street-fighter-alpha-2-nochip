@@ -255,7 +255,7 @@ def report(name, text):
     return totals
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     paths = [Path(name) for name in argv[1:]]
     if not paths:
         paths = sorted((ROOT / "build" / "soundwalk").glob("grp-*.txt"))

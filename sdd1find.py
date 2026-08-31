@@ -111,7 +111,7 @@ def chains(hits, tolerance=2):
     return runs
 
 
-def main():
+def main() -> int:
     if len(sys.argv) < 3:
         print(
             "usage: sdd1find.py <source-rom> <reference-rom> [start] [stop]",

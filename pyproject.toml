@@ -94,3 +94,30 @@ exclude_also = [
   'def frame_hook_site\(rom\):',
   'return \(\*PATCH, \(frame_hook_site\(rom\), FRAME_HOOK\)\)',
 ]
+
+[tool.mypy]
+# The family's flag set: strict, plus every optional error class the checker
+# offers. This project rewrites cartridge code, so the errors worth catching are
+# the ones where a length, an offset or a None crosses a boundary, which is what
+# the optional classes are for.
+strict = true
+python_version = "3.12"
+warn_unreachable = true
+warn_no_return = true
+strict_equality = true
+extra_checks = true
+enable_error_code = [
+  "explicit-override",
+  "ignore-without-code",
+  "possibly-undefined",
+  "redundant-expr",
+  "truthy-bool",
+  "truthy-iterable",
+  "unused-awaitable",
+]
+files = ["."]
+# The pinned models are separate repositories, each checked against its own
+# configuration. Checking them from here would report on a toolchain nobody
+# ships. build/ holds generated and third-party sources this project does not
+# own.
+exclude = "^(?!conformance/|tools/|[^/]+\\.py$)"

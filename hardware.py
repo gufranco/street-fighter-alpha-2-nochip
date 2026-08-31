@@ -37,13 +37,14 @@ explanation.
 import importlib
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 
 ORIGIN = "https://github.com/gufranco/street-fighter-alpha-2-nochip.git"
 """Where a clone comes from, named so a broken tree can be told how to fix itself."""
 
-PACKAGES = {
+PACKAGES: dict[str, str] = {
     "mos65xx": "mos65xx-python",
     "spc700": "sony-spc700-python",
     "sdd1": "snes-sdd1-python",
@@ -71,7 +72,7 @@ class ModelMissing(Exception):
     """A model is pinned here but its submodule was never checked out."""
 
 
-def root_of(package):
+def root_of(package: str) -> Path:
     """Where a vendored model lives, by the name it is imported under."""
     directory = PACKAGES.get(package)
     if directory is None:
@@ -81,7 +82,7 @@ def root_of(package):
     return ROOT / directory
 
 
-def install():
+def install() -> None:
     """Make every vendored model importable, without stacking the path."""
     for package in PACKAGES:
         entry = str(root_of(package))
@@ -89,23 +90,23 @@ def install():
             sys.path.insert(0, entry)
 
 
-def is_checked_out(package):
+def is_checked_out(package: str) -> bool:
     """Whether a pinned model has content and not just a directory."""
     directory = root_of(package)
     return directory.is_dir() and any(directory.iterdir())
 
 
-def missing_models():
+def missing_models() -> list[str]:
     """Every model that is pinned here and not checked out."""
     return [package for package in PACKAGES if not is_checked_out(package)]
 
 
-def is_git_checkout():
+def is_git_checkout() -> bool:
     """Whether this tree carries the git metadata a submodule needs to be filled in."""
     return any((folder / ".git").exists() for folder in (ROOT, *ROOT.parents))
 
 
-def checkout_message(missing, from_git):
+def checkout_message(missing: list[str], from_git: bool) -> str:
     named = ", ".join(sorted(missing))
     subject = "model is" if len(missing) == 1 else "models are"
     said = (
@@ -124,8 +125,16 @@ def checkout_message(missing, from_git):
     )
 
 
-def load(package):
-    """A model, by the name it is published under."""
+def load(package: str) -> Any:
+    """A model, by the name it is published under.
+
+    Typed as `Any` rather than as a module, and the distinction is the honest
+    one. What comes back is chosen at run time from a name, so nothing here
+    knows its interface, and declaring a module type would let a checker believe
+    it had verified attribute accesses it cannot see. Each model is checked
+    against its own configuration in its own repository, which is where those
+    accesses are actually verified.
+    """
     if not is_checked_out(package):
         raise ModelMissing(checkout_message(missing_models(), is_git_checkout()))
     install()

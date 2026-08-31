@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -16,8 +17,9 @@ mapper = hardware.load("mapper")
 ROOT = Path(__file__).resolve().parent
 
 
-def load_module(name):
+def load_module(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -37,13 +39,13 @@ TAGGED = ROOT / "roms" / "sfa2-usa-vc-sound-restored.sfc"
 )
 class TranslationTest(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.image = dump.read(IMAGE)
         cls.entries = rombuild.load_entries(dump.read(TAGGED))
         cls.expected = rombuild.build(dump.read(PATCHED), cls.entries).destinations
         cls.memory = patchrun.SnesMemory(cls.image)
 
-    def test_every_stream_translates_to_its_allocated_address(self):
+    def test_every_stream_translates_to_its_allocated_address(self) -> None:
         wrong = []
         for entry in self.entries:
             outcome = patchrun.translate(self.memory, entry.source)
@@ -53,18 +55,18 @@ class TranslationTest(unittest.TestCase):
 
         self.assertEqual(wrong, [])
 
-    def test_every_stream_leaves_the_fixed_address_bit_clear(self):
+    def test_every_stream_leaves_the_fixed_address_bit_clear(self) -> None:
         for entry in self.entries[:600]:
             outcome = patchrun.translate(self.memory, entry.source)
 
             self.assertFalse(outcome.dmap & patchrun.FIXED_ADDRESS_BIT)
 
-    def test_the_rest_of_the_dmap_byte_is_untouched(self):
+    def test_the_rest_of_the_dmap_byte_is_untouched(self) -> None:
         outcome = patchrun.translate(self.memory, self.entries[0].source, dmap=0xF9)
 
         self.assertEqual(outcome.dmap, 0xF9 & ~patchrun.FIXED_ADDRESS_BIT)
 
-    def test_the_other_fixed_channels_translate_the_same_way(self):
+    def test_the_other_fixed_channels_translate_the_same_way(self) -> None:
         for channel in (0x10, 0x70):
             for entry in self.entries[:200]:
                 outcome = patchrun.translate(self.memory, entry.source, channel=channel)
@@ -76,7 +78,7 @@ class TranslationTest(unittest.TestCase):
                 )
                 self.assertFalse(outcome.dmap & patchrun.FIXED_ADDRESS_BIT)
 
-    def test_the_variable_channel_entry_reads_its_offset_from_y(self):
+    def test_the_variable_channel_entry_reads_its_offset_from_y(self) -> None:
         for channel in (0x00, 0x10, 0x70):
             for entry in self.entries[:100]:
                 outcome = patchrun.translate(
@@ -92,7 +94,7 @@ class TranslationTest(unittest.TestCase):
                 )
                 self.assertFalse(outcome.dmap & patchrun.FIXED_ADDRESS_BIT)
 
-    def test_an_eight_bit_callers_registers_come_back_untouched(self):
+    def test_an_eight_bit_callers_registers_come_back_untouched(self) -> None:
         for entry in self.entries[:300]:
             outcome = patchrun.translate(
                 self.memory, entry.source, a=0x0001, x=0x0034, y=0x0078, c=True
@@ -103,7 +105,7 @@ class TranslationTest(unittest.TestCase):
             self.assertEqual(outcome.cpu.y, 0x78)
             self.assertTrue(outcome.cpu.c)
 
-    def test_a_sixteen_bit_callers_registers_come_back_untouched(self):
+    def test_a_sixteen_bit_callers_registers_come_back_untouched(self) -> None:
         for entry in self.entries[:300]:
             outcome = patchrun.translate(
                 self.memory,
@@ -121,7 +123,7 @@ class TranslationTest(unittest.TestCase):
             self.assertEqual(outcome.cpu.y, 0x5678)
             self.assertTrue(outcome.cpu.c)
 
-    def test_a_narrow_caller_gets_back_only_what_it_could_hold(self):
+    def test_a_narrow_caller_gets_back_only_what_it_could_hold(self) -> None:
         """The high byte of an index register does not survive an eight bit caller.
 
         The routine widens the registers, pushes them whole, and restores the
@@ -138,19 +140,19 @@ class TranslationTest(unittest.TestCase):
         self.assertEqual(outcome.cpu.x, 0x34)
         self.assertEqual(outcome.cpu.y, 0x78)
 
-    def test_the_stack_is_balanced_on_return(self):
+    def test_the_stack_is_balanced_on_return(self) -> None:
         for entry in self.entries[:300]:
             outcome = patchrun.translate(self.memory, entry.source)
 
             self.assertEqual(outcome.cpu.s, patchrun.STACK_TOP)
 
-    def test_the_widths_the_caller_had_are_restored(self):
+    def test_the_widths_the_caller_had_are_restored(self) -> None:
         outcome = patchrun.translate(self.memory, self.entries[0].source)
 
         self.assertTrue(outcome.cpu.m8)
         self.assertTrue(outcome.cpu.x8)
 
-    def test_the_variable_channel_entry_also_balances_its_stack(self):
+    def test_the_variable_channel_entry_also_balances_its_stack(self) -> None:
         for entry in self.entries[:200]:
             outcome = patchrun.translate(
                 self.memory,
@@ -186,7 +188,7 @@ class ReferenceBuildTest(unittest.TestCase):
     closest available check that the mapping is right, short of the SF7."""
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.image = dump.read(STAR_OCEAN)
 
     def run_reference(self, source):
@@ -203,7 +205,7 @@ class ReferenceBuildTest(unittest.TestCase):
         cpu.call(NEVIKSTI_ROUTINE)
         return memory
 
-    def test_the_reference_routine_reaches_the_known_output_of_each_stream(self):
+    def test_the_reference_routine_reaches_the_known_output_of_each_stream(self) -> None:
         for source, expected_file in STAR_OCEAN_STREAMS:
             memory = self.run_reference(source)
             destination = patchrun.dma_source(memory.triggered)
@@ -214,20 +216,20 @@ class ReferenceBuildTest(unittest.TestCase):
 
             self.assertEqual(landed, expected_file, f"source {source:#08x}")
 
-    def test_the_reference_routine_also_clears_the_fixed_address_bit(self):
+    def test_the_reference_routine_also_clears_the_fixed_address_bit(self) -> None:
         for source, _ in STAR_OCEAN_STREAMS:
             memory = self.run_reference(source)
 
             self.assertFalse(memory.triggered[patchrun.DMA_BASE] & patchrun.FIXED_ADDRESS_BIT)
 
-    def test_the_reference_routine_starts_a_transfer(self):
+    def test_the_reference_routine_starts_a_transfer(self) -> None:
         memory = self.run_reference(STAR_OCEAN_STREAMS[0][0])
 
         self.assertIsNotNone(memory.triggered)
 
 
 class EntryTest(unittest.TestCase):
-    def test_too_few_arguments_are_refused_with_the_usage(self):
+    def test_too_few_arguments_are_refused_with_the_usage(self) -> None:
         complained = []
 
         code = patchrun.main(["patchrun.py"], say=lambda _l: None, complain=complained.append)
@@ -239,7 +241,7 @@ class EntryTest(unittest.TestCase):
         IMAGE.exists() and PATCHED.exists() and TAGGED.exists(),
         "the built image is not present",
     )
-    def test_a_whole_run_reports_how_many_streams_it_executed(self):
+    def test_a_whole_run_reports_how_many_streams_it_executed(self) -> None:
         said = []
 
         code = patchrun.main(

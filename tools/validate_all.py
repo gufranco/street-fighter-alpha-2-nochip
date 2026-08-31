@@ -108,7 +108,7 @@ def mapping_for(stem):
     return FREE_MAPPING if stem.endswith("-free") else CART_MAPPING
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     wanted = argv[1] if len(argv) > 1 else ""
     rows = []
     for image in sorted(IMAGES.glob("*.sfc")):

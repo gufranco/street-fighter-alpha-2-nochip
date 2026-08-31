@@ -127,6 +127,7 @@ def table_for(where):
     name = "usastreams" if "usa" in Path(where).name.lower() else "jpstreams"
     root = Path(__file__).resolve().parent.parent
     spec = importlib.util.spec_from_file_location(name, root / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.STREAMS

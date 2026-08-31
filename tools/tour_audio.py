@@ -117,7 +117,7 @@ def report(name, found, summary):
     )
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     wanted = argv[1] if len(argv) > 1 else "both-cart"
     roster = int(argv[2]) if len(argv) > 2 else ROSTER
     budget = int(argv[3]) if len(argv) > 3 else BUDGET

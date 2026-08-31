@@ -4,6 +4,7 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -17,8 +18,9 @@ sdd1 = hardware.load("sdd1")
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load(name):
+def load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -141,7 +143,7 @@ def requests_of(image, extra, frames):
     return wanted
 
 
-def main():
+def main() -> int:
     retail = dump.read(RETAIL)
     for iteration in range(1, 21):
         table = read_table()

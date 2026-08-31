@@ -55,7 +55,7 @@ def compare(before, after):
     return shared, differing
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     before_image = ROOT / (argv[1] if len(argv) > 1 else "build/baseline/usa-both-free.before.sfc")
     after_image = ROOT / (argv[2] if len(argv) > 2 else "build/all/usa-both-free.sfc")
     tag = argv[3] if len(argv) > 3 else "usa"

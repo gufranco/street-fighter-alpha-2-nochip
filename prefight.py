@@ -1,4 +1,5 @@
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -32,7 +33,7 @@ JSL = 0x22
 WINDOW_FIRST_BANK = 0xC0
 
 
-def table():
+def table() -> bytes:
     out = bytearray()
     start = TABLE_START
     step = TABLE_STEP
@@ -46,11 +47,11 @@ def table():
     return bytes(out)
 
 
-def routine():
+def routine() -> bytes:
     return ROUTINE
 
 
-def find_builder(rom):
+def find_builder(rom: bytes | bytearray) -> int | None:
     at = rom.find(BUILDER_SIGNATURE)
     if at == -1:
         return None
@@ -59,11 +60,11 @@ def find_builder(rom):
     return at
 
 
-def call_to(address):
+def call_to(address: int) -> bytes:
     return bytes([JSL, address & 0xFF, (address >> 8) & 0xFF, (address >> 16) & 0xFF])
 
 
-def find_callers(rom, at=None):
+def find_callers(rom: bytes | bytearray, at: int | None = None) -> list[int]:
     at = find_builder(rom) if at is None else at
     if at is None:
         return []
@@ -76,13 +77,13 @@ def find_callers(rom, at=None):
     return found
 
 
-def is_patched(rom):
+def is_patched(rom: bytes | bytearray) -> bool:
     if rom[FILLER_FILE : FILLER_FILE + len(ROUTINE)] != ROUTINE:
         return False
     return not find_callers(rom)
 
 
-def apply(rom):
+def apply(rom: bytes | bytearray) -> bytes:
     if is_patched(rom):
         return bytes(rom)
 
@@ -103,7 +104,7 @@ def apply(rom):
     return bytes(patched)
 
 
-def report(rom):
+def report(rom: bytes | bytearray) -> None:
     at = find_builder(rom)
     if at is None:
         print("  no pre-fight table builder in this ROM")
@@ -117,7 +118,11 @@ def report(rom):
     )
 
 
-def main(argv, say=print, complain=None):
+def main(
+    argv: list[str],
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     complain = say if complain is None else complain
     if len(argv) != 3:

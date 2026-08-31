@@ -19,7 +19,7 @@ BANK_SIZE = 0x10000
 Entry = namedtuple("Entry", "index source target length")
 
 
-def find_markers(tagged):
+def find_markers(tagged: bytes | bytearray) -> list[tuple[int, int]]:
     markers = []
     at = tagged.find(MARKER)
     while at >= 0:
@@ -29,7 +29,7 @@ def find_markers(tagged):
     return markers
 
 
-def build_map(tagged, gfx_size=None):
+def build_map(tagged: bytes | bytearray, gfx_size: int | None = None) -> list[Entry]:
     markers = find_markers(tagged)
     targets = [target for _, target in markers]
     if targets != sorted(targets) or len(set(targets)) != len(targets):
@@ -49,7 +49,7 @@ def build_map(tagged, gfx_size=None):
     return entries
 
 
-def audit(rom, entries):
+def audit(rom: bytes | bytearray, entries: list[Entry]) -> dict[str, int]:
     report = {"measured": 0, "packed": 0, "padded": 0, "overrun": 0, "skipped": 0}
     for entry, following in itertools.pairwise(entries):
         if entry.length is None or not 0 < following.source - entry.source < BANK_SIZE:
@@ -66,22 +66,24 @@ def audit(rom, entries):
     return report
 
 
-def rebuild(rom, entries, gfx_size=None):
-    if any(entry.length is None for entry in entries):
+def rebuild(rom: bytes | bytearray, entries: list[Entry], gfx_size: int | None = None) -> bytes:
+    lengths = [entry.length for entry in entries]
+    if any(length is None for length in lengths):
         raise ValueError("cannot rebuild while any stream length is unknown")
+    known = [(entry, length) for entry, length in zip(entries, lengths, strict=True) if length]
     if gfx_size is None:
-        gfx_size = entries[-1].target + entries[-1].length if entries else 0
+        gfx_size = known[-1][0].target + known[-1][1] if known else 0
 
     blob = bytearray(gfx_size)
-    for entry in entries:
-        if entry.target + entry.length > gfx_size:
+    for entry, length in known:
+        if entry.target + length > gfx_size:
             raise ValueError(f"stream {entry.index} runs past the end of a {gfx_size} byte blob")
-        data = sdd1.decompress(rom, entry.source, entry.length).data
-        blob[entry.target : entry.target + entry.length] = data
+        data = sdd1.decompress(rom, entry.source, length).data
+        blob[entry.target : entry.target + length] = data
     return bytes(blob)
 
 
-def main():
+def main() -> int:
     if len(sys.argv) < 3:
         print(
             "usage: sdd1map.py <tagged-rom> <source-rom> [output.bin]",
@@ -100,7 +102,7 @@ def main():
     print(f"  streams        {len(entries):,}")
     print(f"  source span    {entries[0].source:#09x} .. {entries[-1].source:#09x}")
     print(f"  graphics bytes {declared:,} before the final stream")
-    modes = {}
+    modes: dict[int, int] = {}
     for entry in entries[:-1]:
         planes = sdd1.decompress(rom, entry.source, 2).bitplanes
         modes[planes] = modes.get(planes, 0) + 1

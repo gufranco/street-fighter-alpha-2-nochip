@@ -244,7 +244,7 @@ def report(stock_name, patched_name, stock, patched):
         print(f"    writes per byte went from {cost(stock):.3f} to {cost(patched):.3f}")
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     try:
         stock, patched, roster, budget, fights = options(argv)
     except (Usage, IndexError, ValueError) as refusal:

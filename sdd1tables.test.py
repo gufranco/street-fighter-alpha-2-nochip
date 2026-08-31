@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -13,8 +14,9 @@ dump = hardware.load("romimage").dump
 ROOT = Path(__file__).resolve().parent
 
 
-def load_module(name):
+def load_module(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -31,12 +33,12 @@ def entry(index, source, target, length):
 
 
 class SourceKeyTest(unittest.TestCase):
-    def test_a_stream_is_keyed_by_the_address_the_game_programs(self):
+    def test_a_stream_is_keyed_by_the_address_the_game_programs(self) -> None:
         self.assertEqual(tables.source_key(0x007890), (0xC0, 0x7890))
         self.assertEqual(tables.source_key(0x1AE002), (0xDA, 0xE002))
         self.assertEqual(tables.source_key(0x3E0FAE), (0xFE, 0x0FAE))
 
-    def test_the_bank_carries_the_window_offset_the_engine_ors_in(self):
+    def test_the_bank_carries_the_window_offset_the_engine_ors_in(self) -> None:
         for offset in (0x000000, 0x0F0000, 0x3F0000):
             bank, _ = tables.source_key(offset)
 
@@ -44,31 +46,31 @@ class SourceKeyTest(unittest.TestCase):
 
 
 class AllocationTest(unittest.TestCase):
-    def test_a_lone_stream_sits_at_its_own_address(self):
+    def test_a_lone_stream_sits_at_its_own_address(self) -> None:
         placed = tables.allocate([(0xC0, 0x1234)])
 
         self.assertEqual(placed, [0x1234])
 
-    def test_a_collision_moves_the_later_stream_forward(self):
+    def test_a_collision_moves_the_later_stream_forward(self) -> None:
         placed = tables.allocate([(0xC0, 0x1234), (0xC5, 0x1234)])
 
         self.assertEqual(placed, [0x1234, 0x1235])
 
-    def test_the_scan_finds_every_stream_at_its_own_slot(self):
+    def test_the_scan_finds_every_stream_at_its_own_slot(self) -> None:
         keys = [(0xC0, 0x1000), (0xC5, 0x1000), (0xC0, 0x1001), (0xC5, 0x1002)]
 
         placed = tables.allocate(keys)
 
         tables.verify(keys, placed)
 
-    def test_a_broken_placement_is_reported(self):
+    def test_a_broken_placement_is_reported(self) -> None:
         keys = [(0xC0, 0x1000), (0xC0, 0x1002)]
         broken = [0x1003, 0x1002]
 
         with self.assertRaises(tables.PlacementError):
             tables.verify(keys, broken)
 
-    def test_the_table_cannot_hold_more_streams_than_slots(self):
+    def test_the_table_cannot_hold_more_streams_than_slots(self) -> None:
         keys = [(0xC0, i & 0xFFFF) for i in range(tables.SLOTS + 1)]
 
         with self.assertRaises(tables.PlacementError):
@@ -76,7 +78,7 @@ class AllocationTest(unittest.TestCase):
 
 
 class BuildTest(unittest.TestCase):
-    def test_four_tables_of_one_bank_each_come_back(self):
+    def test_four_tables_of_one_bank_each_come_back(self) -> None:
         entries = [entry(0, 0x007890, 0, 832)]
 
         built = tables.build([(e, 0x028000) for e in entries])
@@ -85,7 +87,7 @@ class BuildTest(unittest.TestCase):
         for part in (built.dest_low, built.dest_high, built.dest_bank):
             self.assertEqual(len(part), tables.SLOTS)
 
-    def test_a_stream_reads_back_the_destination_it_was_given(self):
+    def test_a_stream_reads_back_the_destination_it_was_given(self) -> None:
         e = entry(0, 0x007890, 0, 832)
 
         built = tables.build([(e, 0x1F8000)])
@@ -96,12 +98,12 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(built.dest_high[slot], 0x80)
         self.assertEqual(built.dest_bank[slot], 0x1F)
 
-    def test_empty_slots_stay_zero_so_the_scan_skips_them(self):
+    def test_empty_slots_stay_zero_so_the_scan_skips_them(self) -> None:
         built = tables.build([(entry(0, 0x007890, 0, 832), 0x028000)])
 
         self.assertEqual(built.key[0x1234], tables.EMPTY)
 
-    def test_a_destination_bank_of_zero_is_refused(self):
+    def test_a_destination_bank_of_zero_is_refused(self) -> None:
         with self.assertRaises(ValueError):
             tables.build([(entry(0, 0x007890, 0, 832), 0x008000)])
 
@@ -109,10 +111,10 @@ class BuildTest(unittest.TestCase):
 @unittest.skipUnless(TAGGED.exists(), "the tagged rom is not present")
 class RealMapTest(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.entries = [e for e in sdd1map.build_map(dump.read(TAGGED)) if e.length]
 
-    def test_every_real_stream_places_and_verifies(self):
+    def test_every_real_stream_places_and_verifies(self) -> None:
         keys = [tables.source_key(e.source) for e in self.entries]
 
         placed = tables.allocate(keys)
@@ -120,7 +122,7 @@ class RealMapTest(unittest.TestCase):
         tables.verify(keys, placed)
         self.assertEqual(len(placed), len(self.entries))
 
-    def test_the_real_map_fits_with_room_to_spare(self):
+    def test_the_real_map_fits_with_room_to_spare(self) -> None:
         keys = [tables.source_key(e.source) for e in self.entries]
 
         placed = tables.allocate(keys)
@@ -128,7 +130,7 @@ class RealMapTest(unittest.TestCase):
         self.assertLess(len(set(placed)), tables.SLOTS // 8)
         self.assertEqual(len(set(placed)), len(placed))
 
-    def test_most_streams_land_on_their_own_address_without_probing(self):
+    def test_most_streams_land_on_their_own_address_without_probing(self) -> None:
         keys = [tables.source_key(e.source) for e in self.entries]
 
         placed = tables.allocate(keys)

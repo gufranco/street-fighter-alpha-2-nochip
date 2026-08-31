@@ -16,3 +16,4 @@ emu-stock/
 __pycache__/
 .ruff_cache/
 .DS_Store
+.mypy_cache/

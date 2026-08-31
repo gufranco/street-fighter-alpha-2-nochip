@@ -2,12 +2,14 @@ import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 
 
-def load_module(name):
+def load_module(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -27,29 +29,29 @@ def retail(path):
 
 
 class RoutineTest(unittest.TestCase):
-    def test_the_routine_ends_in_a_return(self):
+    def test_the_routine_ends_in_a_return(self) -> None:
         self.assertEqual(repeatload.ROUTINE[-1], 0x60)
 
-    def test_the_routine_restores_the_instruction_it_replaced(self):
+    def test_the_routine_restores_the_instruction_it_replaced(self) -> None:
         self.assertEqual(repeatload.ROUTINE[-4:-1], bytes([0xA9, 0x00, 0x15]))
 
-    def test_every_marker_access_is_long_addressed(self):
+    def test_every_marker_access_is_long_addressed(self) -> None:
         loads = repeatload.ROUTINE.count(0xAF)
         stores = repeatload.ROUTINE.count(0x8F)
 
         self.assertEqual(loads, 3)
         self.assertEqual(stores, 3)
 
-    def test_the_routine_fits_the_filler_it_is_written_into(self):
+    def test_the_routine_fits_the_filler_it_is_written_into(self) -> None:
         self.assertLess(len(repeatload.ROUTINE), repeatload.FILLER_SIZE)
 
-    def test_the_hook_is_a_call_to_the_routine(self):
+    def test_the_hook_is_a_call_to_the_routine(self) -> None:
         self.assertEqual(repeatload.hook(), bytes([0x20, repeatload.ROUTINE_ADDRESS & 0xFF, 0xF6]))
 
-    def test_the_hook_is_the_same_length_as_what_it_replaces(self):
+    def test_the_hook_is_the_same_length_as_what_it_replaces(self) -> None:
         self.assertEqual(len(repeatload.hook()), len(repeatload.REPLACED))
 
-    def test_the_routine_matches_what_the_assembler_emits(self):
+    def test_the_routine_matches_what_the_assembler_emits(self) -> None:
         assembled = ROOT / "asm" / "repeat-out.sfc"
         if not assembled.exists():
             raise unittest.SkipTest("assemble asm/repeat-load.asm first")
@@ -63,7 +65,7 @@ class RoutineTest(unittest.TestCase):
 
 
 class SiteTest(unittest.TestCase):
-    def test_the_hook_site_carries_the_expected_instruction_in_both_regions(self):
+    def test_the_hook_site_carries_the_expected_instruction_in_both_regions(self) -> None:
         for path in (USA, JP):
             rom = retail(path)
 
@@ -73,14 +75,14 @@ class SiteTest(unittest.TestCase):
                 str(path),
             )
 
-    def test_the_filler_is_free_in_both_regions(self):
+    def test_the_filler_is_free_in_both_regions(self) -> None:
         for path in (USA, JP):
             rom = retail(path)
 
             window = rom[repeatload.FILLER_FILE : repeatload.FILLER_FILE + repeatload.FILLER_SIZE]
             self.assertEqual(set(window), {0xFF}, str(path))
 
-    def test_the_marker_sits_inside_the_run_no_write_was_seen_in(self):
+    def test_the_marker_sits_inside_the_run_no_write_was_seen_in(self) -> None:
         """The measured free run, not a range that looked free.
 
         Two forty five thousand frame tours, one per region, walking the whole
@@ -94,10 +96,10 @@ class SiteTest(unittest.TestCase):
         self.assertGreaterEqual(repeatload.MARKER, first)
         self.assertLessEqual(repeatload.MARKER + 3, last)
 
-    def test_the_marker_is_not_in_the_page_the_game_keeps_variables_in(self):
+    def test_the_marker_is_not_in_the_page_the_game_keeps_variables_in(self) -> None:
         self.assertGreater(repeatload.MARKER & 0xFFFF, 0x2000)
 
-    def test_every_address_the_routine_touches_is_the_marker(self):
+    def test_every_address_the_routine_touches_is_the_marker(self) -> None:
         touched = set()
         for at in range(len(repeatload.ROUTINE) - 3):
             if repeatload.ROUTINE[at] in (0xAF, 0x8F):
@@ -108,7 +110,7 @@ class SiteTest(unittest.TestCase):
 
 
 class ApplyTest(unittest.TestCase):
-    def test_applying_installs_the_hook_and_the_routine(self):
+    def test_applying_installs_the_hook_and_the_routine(self) -> None:
         for path in (USA, JP):
             rom = retail(path)
 
@@ -125,18 +127,18 @@ class ApplyTest(unittest.TestCase):
                 str(path),
             )
 
-    def test_applying_twice_changes_nothing_the_second_time(self):
+    def test_applying_twice_changes_nothing_the_second_time(self) -> None:
         rom = retail(USA)
 
         once = repeatload.apply(rom)
 
         self.assertEqual(repeatload.apply(once), once)
 
-    def test_a_rom_without_the_site_is_refused(self):
+    def test_a_rom_without_the_site_is_refused(self) -> None:
         with self.assertRaises(ValueError):
             repeatload.apply(b"\x00" * 0x100000)
 
-    def test_nothing_outside_the_hook_and_the_routine_moves(self):
+    def test_nothing_outside_the_hook_and_the_routine_moves(self) -> None:
         rom = retail(USA)
 
         patched = repeatload.apply(rom)
@@ -149,7 +151,7 @@ class ApplyTest(unittest.TestCase):
         moved = {at for at, (a, b) in enumerate(zip(rom, patched, strict=True)) if a != b}
         self.assertTrue(moved <= allowed, sorted(moved - allowed)[:8])
 
-    def test_it_does_not_collide_with_the_pre_fight_routine(self):
+    def test_it_does_not_collide_with_the_pre_fight_routine(self) -> None:
         prefight = load_module("prefight")
 
         first = range(prefight.FILLER_FILE, prefight.FILLER_FILE + len(prefight.ROUTINE))
@@ -161,7 +163,7 @@ class ApplyTest(unittest.TestCase):
 class RefusalTest(unittest.TestCase):
     """An image the patch does not recognise is refused rather than patched anyway."""
 
-    def test_an_image_whose_filler_is_not_free_is_refused(self):
+    def test_an_image_whose_filler_is_not_free_is_refused(self) -> None:
         rom = bytearray(repeatload.FILLER_END + 0x100)
         rom[repeatload.HOOK_FILE : repeatload.HOOK_FILE + len(repeatload.REPLACED)] = (
             repeatload.REPLACED
@@ -176,7 +178,7 @@ class RefusalTest(unittest.TestCase):
 
         self.assertIn("filler", str(raised.exception))
 
-    def test_an_image_whose_allocator_setup_is_elsewhere_is_refused(self):
+    def test_an_image_whose_allocator_setup_is_elsewhere_is_refused(self) -> None:
         rom = bytearray(repeatload.FILLER_END + 0x100)
         rom[repeatload.FILLER_FILE : repeatload.FILLER_END] = b"\xff" * (
             repeatload.FILLER_END - repeatload.FILLER_FILE
@@ -197,7 +199,7 @@ class EntryTest(unittest.TestCase):
         source.write_bytes(USA.read_bytes())
         return source, where / "out.sfc"
 
-    def test_too_few_arguments_are_refused_with_the_usage(self):
+    def test_too_few_arguments_are_refused_with_the_usage(self) -> None:
         complained = []
 
         code = repeatload.main(["repeatload.py"], say=lambda _l: None, complain=complained.append)
@@ -206,7 +208,7 @@ class EntryTest(unittest.TestCase):
         self.assertIn("usage", complained[0])
 
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
-    def test_patching_the_source_in_place_is_refused(self):
+    def test_patching_the_source_in_place_is_refused(self) -> None:
         source, _ = self._paths()
         complained = []
 
@@ -220,7 +222,7 @@ class EntryTest(unittest.TestCase):
         self.assertIn("in place", complained[0])
 
     @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
-    def test_a_run_writes_the_patched_image_and_says_what_it_did(self):
+    def test_a_run_writes_the_patched_image_and_says_what_it_did(self) -> None:
         source, output = self._paths()
         said = []
 

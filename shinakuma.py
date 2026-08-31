@@ -1,12 +1,15 @@
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 
 
-def _load(name):
+def _load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -82,7 +85,7 @@ SET_FLAG = 0x29
 BRANCH = bytes([0x80, SET_FLAG - (PRECONDITION + 2)])
 
 
-def find_gate(rom):
+def find_gate(rom: bytes | bytearray) -> int | None:
     found = []
     position = rom.find(GATE)
     while position != -1:
@@ -93,7 +96,7 @@ def find_gate(rom):
     return found[0] if found else None
 
 
-def is_patched(rom):
+def is_patched(rom: bytes | bytearray) -> bool:
     if find_gate(rom) is not None:
         return False
     probe = bytearray(GATE)
@@ -101,7 +104,7 @@ def is_patched(rom):
     return rom.find(bytes(probe)) != -1
 
 
-def apply(rom):
+def apply(rom: bytes | bytearray) -> bytes:
     if is_patched(rom):
         return bytes(rom)
 
@@ -112,10 +115,14 @@ def apply(rom):
     patched = bytearray(rom)
     site = gate + PRECONDITION
     patched[site : site + 2] = BRANCH
-    return spcfast.write_checksum(patched)
+    return bytes(spcfast.write_checksum(patched))
 
 
-def main(argv, say=print, complain=None):
+def main(
+    argv: list[str],
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with both streams passed in so a run can be checked."""
     complain = say if complain is None else complain
     if len(argv) != 3:
@@ -132,8 +139,11 @@ def main(argv, say=print, complain=None):
     output.write_bytes(patched)
 
     gate = find_gate(rom)
-    say(f"unlock gate   {gate:#08x}")
-    say(f"branch site   {gate + PRECONDITION:#08x}  {BRANCH.hex(' ')}")
+    if gate is None:
+        say("unlock gate   already removed, so this image was patched before")
+    else:
+        say(f"unlock gate   {gate:#08x}")
+        say(f"branch site   {gate + PRECONDITION:#08x}  {BRANCH.hex(' ')}")
     say(f"[done] {output} ({len(patched):,} bytes)")
     return 0
 

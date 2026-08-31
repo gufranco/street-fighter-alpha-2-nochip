@@ -1,6 +1,7 @@
 import sys
 from collections import namedtuple
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -25,11 +26,11 @@ RESYNC_FORWARD = 12
 Found = namedtuple("Found", "offset address register")
 
 
-def lorom_address(offset):
+def lorom_address(offset: int) -> int:
     return (offset // 0x8000) << 16 | (0x8000 + offset % 0x8000)
 
 
-def compressed_mask(rom, entries):
+def compressed_mask(rom: bytes | bytearray, entries: list[Any]) -> bytearray:
     mask = bytearray(len(rom))
     for entry in entries:
         if entry.length is None:
@@ -40,7 +41,7 @@ def compressed_mask(rom, entries):
     return mask
 
 
-def find_register_writes(rom, mask):
+def find_register_writes(rom: bytes | bytearray, mask: bytearray) -> list[Any]:
     found = []
     for index in range(REGISTER_COUNT):
         register = REGISTER_BASE + index
@@ -54,8 +55,13 @@ def find_register_writes(rom, mask):
     return found
 
 
-def window(rom, offset, back=RESYNC_BACK, forward=RESYNC_FORWARD):
-    best = None
+def window(
+    rom: bytes | bytearray,
+    offset: int,
+    back: int = RESYNC_BACK,
+    forward: int = RESYNC_FORWARD,
+) -> Any:
+    best: tuple[int, int, bool, bool] | None = None
     for distance in range(back, 3, -1):
         start = offset - distance
         if start < 0:
@@ -75,7 +81,7 @@ def window(rom, offset, back=RESYNC_BACK, forward=RESYNC_FORWARD):
     return cpu.disassemble(rom[: offset + forward], start, lorom_address(start), m=m, x=x)
 
 
-def main():
+def main() -> int:
     if len(sys.argv) < 3:
         print("usage: sdd1sites.py <source-rom> <tagged-rom>", file=sys.stderr)
         return 2
@@ -86,7 +92,7 @@ def main():
     print(f"  compressed data covers {sum(mask):,} of {len(rom):,} bytes")
 
     found = find_register_writes(rom, mask)
-    by_register = {}
+    by_register: dict[int, list[Any]] = {}
     for item in found:
         by_register.setdefault(item.register, []).append(item)
     for register in sorted(by_register):

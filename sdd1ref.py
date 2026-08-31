@@ -98,7 +98,7 @@ def sample_cases(rom, count, seed):
     return [(rng.randrange(limit), rng.choice(SAMPLE_LENGTHS)) for _ in range(count)]
 
 
-def main():
+def main() -> int:
     if len(sys.argv) < 2:
         print("usage: sdd1ref.py <rom> [cases] [seed]", file=sys.stderr)
         return 2

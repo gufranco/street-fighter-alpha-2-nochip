@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -11,8 +12,9 @@ import hardware  # noqa: E402
 mapper = hardware.load("mapper")
 
 
-def load_module(name, path):
+def load_module(name: str, path: Path) -> Any:
     spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -45,13 +47,13 @@ def _entry(image, banks, slot, source, destination):
 
 
 class WindowReadTest(unittest.TestCase):
-    def test_a_byte_comes_back_from_where_it_was_written(self):
+    def test_a_byte_comes_back_from_where_it_was_written(self) -> None:
         image = _image()
         _write(image, BANKS, 0x60, 0x1234, 0xAB)
 
         self.assertEqual(verify_image.window_read(image, BANKS, 0x60, 0x1234), 0xAB)
 
-    def test_two_addresses_in_different_banks_do_not_collide(self):
+    def test_two_addresses_in_different_banks_do_not_collide(self) -> None:
         image = _image()
         _write(image, BANKS, 0x60, 0x1234, 0xAB)
         _write(image, BANKS, 0x61, 0x1234, 0xCD)
@@ -59,7 +61,7 @@ class WindowReadTest(unittest.TestCase):
         self.assertEqual(verify_image.window_read(image, BANKS, 0x60, 0x1234), 0xAB)
         self.assertEqual(verify_image.window_read(image, BANKS, 0x61, 0x1234), 0xCD)
 
-    def test_the_two_halves_of_a_bank_are_different_places(self):
+    def test_the_two_halves_of_a_bank_are_different_places(self) -> None:
         image = _image()
         _write(image, BANKS, 0x60, 0x0000, 0x11)
         _write(image, BANKS, 0x60, 0x8000, 0x22)
@@ -69,7 +71,7 @@ class WindowReadTest(unittest.TestCase):
 
 
 class ResolveTest(unittest.TestCase):
-    def test_an_entry_at_the_exact_slot_is_found_without_scanning(self):
+    def test_an_entry_at_the_exact_slot_is_found_without_scanning(self) -> None:
         image = _image()
         _entry(image, BANKS, 0x104C, 0x19104C, 0x0C4000)
 
@@ -78,7 +80,7 @@ class ResolveTest(unittest.TestCase):
         self.assertEqual(destination, 0x0C4000)
         self.assertEqual(step, 0)
 
-    def test_an_entry_a_few_slots_along_is_found_and_the_distance_reported(self):
+    def test_an_entry_a_few_slots_along_is_found_and_the_distance_reported(self) -> None:
         image = _image()
         _entry(image, BANKS, 0x104C + 3, 0x19104C, 0x0C4000)
 
@@ -87,22 +89,22 @@ class ResolveTest(unittest.TestCase):
         self.assertEqual(destination, 0x0C4000)
         self.assertEqual(step, 3)
 
-    def test_an_entry_past_the_budget_is_not_found(self):
+    def test_an_entry_past_the_budget_is_not_found(self) -> None:
         image = _image()
         _entry(image, BANKS, 0x104C + verify_image.SCAN_BUDGET + 1, 0x19104C, 0x0C4000)
 
         self.assertEqual(verify_image.resolve(image, BANKS, 0x19104C), (None, None))
 
-    def test_an_empty_table_resolves_nothing(self):
+    def test_an_empty_table_resolves_nothing(self) -> None:
         self.assertEqual(verify_image.resolve(_image(), BANKS, 0x19104C), (None, None))
 
-    def test_an_entry_for_another_source_bank_is_not_this_one(self):
+    def test_an_entry_for_another_source_bank_is_not_this_one(self) -> None:
         image = _image()
         _entry(image, BANKS, 0x104C, 0x18104C, 0x0C4000)
 
         self.assertEqual(verify_image.resolve(image, BANKS, 0x19104C), (None, None))
 
-    def test_a_lookup_near_the_top_of_a_bank_wraps_rather_than_reading_the_next(self):
+    def test_a_lookup_near_the_top_of_a_bank_wraps_rather_than_reading_the_next(self) -> None:
         image = _image()
         _entry(image, BANKS, 0x0001, 0x19FFFF, 0x0C4000)
 
@@ -113,28 +115,28 @@ class ResolveTest(unittest.TestCase):
 
 
 class NamingTest(unittest.TestCase):
-    def test_an_image_built_with_the_corrections_says_so_in_its_name(self):
+    def test_an_image_built_with_the_corrections_says_so_in_its_name(self) -> None:
         self.assertTrue(verify_image.carries_game_fixes("build/all/jp-both-free.sfc"))
 
-    def test_one_built_without_them_does_not(self):
+    def test_one_built_without_them_does_not(self) -> None:
         self.assertFalse(verify_image.carries_game_fixes("build/all/jp-sa-free.sfc"))
 
-    def test_the_check_ignores_case(self):
+    def test_the_check_ignores_case(self) -> None:
         self.assertTrue(verify_image.carries_game_fixes("BUILD/ALL/JP-BOTH-FREE.SFC"))
 
-    def test_a_japanese_image_resolves_to_the_japanese_table(self):
+    def test_a_japanese_image_resolves_to_the_japanese_table(self) -> None:
         streams, retail = verify_image.region_of("jp-both-free.sfc")
 
         self.assertEqual(streams, verify_image.jpstreams.STREAMS)
         self.assertIn("sfz2", retail.name)
 
-    def test_a_usa_image_resolves_to_the_usa_table(self):
+    def test_a_usa_image_resolves_to_the_usa_table(self) -> None:
         streams, retail = verify_image.region_of("usa-both-free.sfc")
 
         self.assertEqual(streams, verify_image.usastreams.STREAMS)
         self.assertIn("sfa2", retail.name)
 
-    def test_a_retail_name_is_enough_to_tell_the_region(self):
+    def test_a_retail_name_is_enough_to_tell_the_region(self) -> None:
         self.assertEqual(
             verify_image.region_of("sfz2-jp-final.sfc")[0], verify_image.jpstreams.STREAMS
         )
@@ -142,7 +144,7 @@ class NamingTest(unittest.TestCase):
             verify_image.region_of("sfa2-usa-final.sfc")[0], verify_image.usastreams.STREAMS
         )
 
-    def test_a_name_belonging_to_no_region_is_refused_rather_than_guessed(self):
+    def test_a_name_belonging_to_no_region_is_refused_rather_than_guessed(self) -> None:
         with self.assertRaises(ValueError):
             verify_image.region_of("something-else.sfc")
 

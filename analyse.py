@@ -46,7 +46,7 @@ def report(label, data):
     return comp_bytes
 
 
-def main():
+def main() -> int:
     roms = {}
     for name, path in [
         ("so_orig", sys.argv[1]),

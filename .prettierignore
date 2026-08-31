@@ -11,3 +11,4 @@ sony-spc700-python/
 validated/
 validated-v2/
 validated-v3/
+.mypy_cache/

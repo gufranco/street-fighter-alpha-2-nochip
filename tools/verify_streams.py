@@ -1,6 +1,7 @@
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -12,8 +13,9 @@ dump = hardware.load("romimage").dump
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load(name):
+def load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -38,7 +40,7 @@ SETS = {
 }
 
 
-def batches(cases, size=BATCH):
+def batches(cases: list[Any], size: int = BATCH) -> list[list[Any]]:
     """The cases split into runs the reference is asked about one run at a time.
 
     The reference runs in a container, and handing it every stream at once means
@@ -49,7 +51,7 @@ def batches(cases, size=BATCH):
     return [cases[start : start + size] for start in range(0, len(cases), size)]
 
 
-def verify(region):
+def verify(region: str) -> int:
     retail, cases_for = SETS[region]
     rom = dump.read(retail)
     cases = cases_for()
@@ -65,7 +67,7 @@ def verify(region):
     return cases, mismatches
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     wanted = argv[1:] or sorted(SETS)
     if sdd1ref.build_image() != 0:
         print("the reference image failed to build", file=sys.stderr)

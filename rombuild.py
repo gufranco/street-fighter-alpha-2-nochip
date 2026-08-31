@@ -205,7 +205,7 @@ def build(rom, entries, image_banks=IMAGE_BANKS, extra=()):
     return Result(bytes(image), destinations, tables, regions)
 
 
-def main():
+def main() -> int:
     if len(sys.argv) < 4:
         print(
             "usage: rombuild.py <patched-rom> <tagged-rom> <output.sfc>",

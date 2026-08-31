@@ -1,4 +1,5 @@
 from collections import namedtuple
+from typing import Any
 
 SLOTS = 0x10000
 EMPTY = 0x00
@@ -12,11 +13,11 @@ class PlacementError(Exception):
     pass
 
 
-def source_key(offset):
+def source_key(offset: int) -> tuple[int, int]:
     return WINDOW_BASE + (offset >> 16), offset & 0xFFFF
 
 
-def _first_free(taken, start):
+def _first_free(taken: dict[int, int], start: int) -> int:
     slot = start
     for _ in range(SLOTS):
         if slot not in taken:
@@ -25,7 +26,7 @@ def _first_free(taken, start):
     raise PlacementError("the key table is full")
 
 
-def _scan(table, bank, addr):
+def _scan(table: dict[int, int], bank: int, addr: int) -> int | None:
     slot = addr
     for _ in range(SLOTS):
         if table.get(slot) == bank:
@@ -34,13 +35,13 @@ def _scan(table, bank, addr):
     return None
 
 
-def allocate(keys):
+def allocate(keys: list[tuple[int, int]]) -> list[int]:
     if len(keys) > SLOTS:
         raise PlacementError(f"{len(keys)} streams do not fit in {SLOTS} slots")
 
     order = sorted(range(len(keys)), key=lambda i: keys[i][1])
-    placed = [None] * len(keys)
-    table = {}
+    placed: list[int] = [0] * len(keys)
+    table: dict[int, int] = {}
     for index in order:
         bank, addr = keys[index]
         slot = _first_free(table, addr)
@@ -68,7 +69,7 @@ def allocate(keys):
     raise PlacementError("could not find a placement where every scan is unambiguous")
 
 
-def verify(keys, placed):
+def verify(keys: list[tuple[int, int]], placed: list[int]) -> None:
     table = {}
     for (bank, _), slot in zip(keys, placed, strict=True):
         if slot in table:
@@ -84,7 +85,7 @@ def verify(keys, placed):
             )
 
 
-def build(pairs):
+def build(pairs: list[tuple[Any, int]]) -> Tables:
     keys = [source_key(entry.source) for entry, _ in pairs]
     slots = allocate(keys)
     verify(keys, slots)

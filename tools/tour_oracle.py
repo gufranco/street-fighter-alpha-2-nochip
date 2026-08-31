@@ -3,6 +3,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -15,8 +16,9 @@ sdd1 = hardware.load("sdd1")
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load(name):
+def load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -87,7 +89,7 @@ def requests(lines):
     return wanted
 
 
-def main():
+def main() -> int:
     rom = dump.read(RETAIL)
     table = {}
     for line in TABLE.read_text().splitlines():

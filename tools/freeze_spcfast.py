@@ -4,6 +4,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -22,8 +23,9 @@ SOURCE = "asm/spc-fast-upload.asm"
 CHECKSUM_FIELD = range(0x007FDC, 0x007FE0)
 
 
-def load(name):
+def load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
+    assert spec is not None and spec.loader is not None, "no loader for that path"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -145,7 +147,7 @@ def rewrite(source, shared, hook_body, hook_sites):
     )
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     check_only = "--check" in argv[1:]
 
     assembled = {region: assemble(region) for region in RETAIL}
