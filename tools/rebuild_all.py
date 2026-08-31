@@ -1,6 +1,7 @@
 import importlib.util
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -52,11 +53,21 @@ def entries_for(region: str) -> Any:
     return rombuild.entries_from_map({str(source): length for source, length in table})
 
 
-def assemble(region: str, name: str, cart: bytes | bytearray) -> Path:
+def assemble(
+    region: str,
+    name: str,
+    cart: bytes | bytearray,
+    execute: Callable[..., Any] = subprocess.run,
+) -> Path:
+    """Stage one variant and assemble the bypass against it.
+
+    The shelling out is a parameter so the staging and the naming can be driven
+    without the assembler on the machine.
+    """
     staged = OUT / f"{region}-{name}-cart.sfc"
     staged.write_bytes(cart)
     output = f"{region}-{name}-bypass.sfc"
-    subprocess.run(
+    execute(
         [
             sys.executable,
             "build.py",
@@ -78,25 +89,50 @@ def assemble(region: str, name: str, cart: bytes | bytearray) -> Path:
 PREFIGHT_VARIANT = "both"
 
 
-def image_source(name: str, bypass: Path) -> tuple[Any, tuple[Any, ...]]:
-    rom = dump.read(bypass)
+def image_source(
+    name: str, bypass: Path, read: Callable[[Path], Any] | None = None
+) -> tuple[Any, tuple[Any, ...]]:
+    """What goes into the image, and anything that has to be placed alongside it.
+
+    Only one variant carries the pre-fight patch, and only that one needs its
+    table written into the image. The cartridge reader is a parameter so both
+    answers can be driven without an assembled bypass on disk.
+    """
+    read = dump.read if read is None else read
+    rom = read(bypass)
     if name != PREFIGHT_VARIANT:
         return rom, ()
     return prefight.apply(rom), ((prefight.TABLE_ADDRESS, prefight.table()),)
 
 
-def main() -> int:
+def main(
+    carts: dict[str, dict[str, bytes | bytearray]] | None = None,
+    build: Callable[..., Path] = assemble,
+    source_for: Callable[[str, Path], tuple[Any, tuple[Any, ...]]] = image_source,
+    table_for: Callable[[str], Any] = entries_for,
+    say: Callable[[str], None] = print,
+) -> int:
+    """Rebuild every variant of every region, in cartridge, bypass and free form.
+
+    The variant set, the assembler and the prefight step are parameters, so the
+    loop can be driven without the dumps and without the assembler. Deriving the
+    variants is not tested here because each patch carries its own proof.
+    """
     OUT.mkdir(parents=True, exist_ok=True)
-    for region, path in RETAIL.items():
-        retail = dump.read(path)
-        entries = entries_for(region)
-        for name, cart in variants(retail).items():
-            bypass = assemble(region, name, cart)
-            source, extra = image_source(name, bypass)
+    carts = (
+        {region: variants(dump.read(path)) for region, path in RETAIL.items()}
+        if carts is None
+        else carts
+    )
+    for region, region_carts in carts.items():
+        entries = table_for(region)
+        for name, cart in region_carts.items():
+            bypass = build(region, name, cart)
+            source, extra = source_for(name, bypass)
             image = rombuild.build(source, entries, extra=extra).image
             free = OUT / f"{region}-{name}-free.sfc"
             free.write_bytes(rewrite.declare_rom_only(image))
-            print(f"  {region}-{name}: cart, bypass, free ({len(entries)} streams)", flush=True)
+            say(f"  {region}-{name}: cart, bypass, free ({len(entries)} streams)")
     return 0
 
 

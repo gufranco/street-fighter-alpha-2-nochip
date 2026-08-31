@@ -97,5 +97,131 @@ class EntryTest(unittest.TestCase):
         self.assertNotEqual(jp, usa)
 
 
+class AssembleTest(unittest.TestCase):
+    """Staging one variant and asking the assembler for it."""
+
+    @staticmethod
+    def build(region: str, name: str, cart: bytes) -> tuple[Path, list[Any]]:
+        asked: list[Any] = []
+
+        def _record(args: Any, **_rest: Any) -> Any:
+            asked.append(args)
+            (rebuild_all.ROOT / "asm" / args[4]).write_bytes(cart)
+            return None
+
+        return rebuild_all.assemble(region, name, cart, execute=_record), asked
+
+    def test_the_bypass_source_for_the_region_is_the_one_assembled(self) -> None:
+        _, asked = self.build("jp", "probe", bytes(0x1000))
+
+        self.assertIn(rebuild_all.BYPASS["jp"], asked[0][2])
+
+    def test_the_staged_cartridge_is_written_beside_the_output(self) -> None:
+        self.build("jp", "probe", bytes(0x1000))
+
+        self.assertTrue((rebuild_all.OUT / "jp-probe-cart.sfc").exists())
+
+    def test_it_returns_the_assembled_image_under_the_build_directory(self) -> None:
+        found, _ = self.build("jp", "probe", bytes(0x1000))
+
+        self.assertEqual(found, rebuild_all.OUT / "jp-probe-bypass.sfc")
+
+    def test_the_scratch_file_the_assembler_wrote_is_removed(self) -> None:
+        self.build("jp", "probe", bytes(0x1000))
+
+        self.assertFalse((rebuild_all.ROOT / "asm" / "jp-probe-bypass.sfc").exists())
+
+
+class ImageSourceTest(unittest.TestCase):
+    """What each variant puts into the image."""
+
+    ROM = bytes(0x400000)
+
+    def test_an_ordinary_variant_carries_nothing_extra(self) -> None:
+        found = rebuild_all.image_source("base", Path("bypass.sfc"), read=lambda _p: self.ROM)
+
+        self.assertEqual(found, (self.ROM, ()))
+
+    def test_the_prefight_variant_carries_its_table(self) -> None:
+        rom = bytearray(self.ROM)
+        at = 0x030000
+        rom[at : at + len(rebuild_all.prefight.BUILDER_SIGNATURE)] = (
+            rebuild_all.prefight.BUILDER_SIGNATURE
+        )
+        rom[rebuild_all.prefight.FILLER_FILE : rebuild_all.prefight.FILLER_END] = (
+            b"\xff" * rebuild_all.prefight.FILLER_SIZE
+        )
+        window = rebuild_all.prefight.WINDOW_FIRST_BANK + (at >> 16)
+        rom[0x020000:0x020004] = rebuild_all.prefight.call_to((window << 16) | (at & 0xFFFF))
+
+        _, extra = rebuild_all.image_source(
+            rebuild_all.PREFIGHT_VARIANT, Path("bypass.sfc"), read=lambda _p: bytes(rom)
+        )
+
+        self.assertEqual(extra[0][0], rebuild_all.prefight.TABLE_ADDRESS)
+
+
+class CommandTest(unittest.TestCase):
+    """The rebuild loop, driven without the dumps and without the assembler."""
+
+    @staticmethod
+    def headed() -> bytes:
+        rom = bytearray(0x400000)
+        rom[0x7FC0:0x7FD5] = b"PROBE                "[:21]
+        rom[0x7FD5], rom[0x7FD7], rom[0x7FD9] = 0x20, 0x0C, 0x01
+        rom[0x7FDA], rom[0x7FDE:0x7FE0] = 0x33, (0xFFFF).to_bytes(2, "little")
+        return bytes(rom)
+
+    def run_with(self, carts: dict[str, dict[str, Any]]) -> tuple[int, list[str]]:
+        said: list[str] = []
+        rom = self.headed()
+        code = rebuild_all.main(
+            carts=carts,
+            build=lambda region, name, _c: rebuild_all.OUT / f"{region}-{name}-bypass.sfc",
+            source_for=lambda _n, _b: (rom, ()),
+            table_for=lambda _r: [],
+            say=said.append,
+        )
+        return code, said
+
+    def test_one_variant_produces_one_report_line(self) -> None:
+        code, said = self.run_with({"jp": {"base": b""}})
+
+        self.assertEqual((code, len(said)), (0, 1))
+
+    def test_the_line_names_the_region_and_the_variant(self) -> None:
+        _, said = self.run_with({"jp": {"base": b""}})
+
+        self.assertIn("jp-base:", said[0])
+
+    def test_every_variant_of_every_region_is_built(self) -> None:
+        _, said = self.run_with({"jp": {"base": b"", "spc": b""}, "usa": {"base": b""}})
+
+        self.assertEqual(len(said), 3)
+
+    def test_the_free_image_is_written_where_the_name_says(self) -> None:
+        self.run_with({"jp": {"base": b""}})
+
+        self.assertTrue((rebuild_all.OUT / "jp-base-free.sfc").exists())
+
+    def test_the_prefight_variant_carries_its_table(self) -> None:
+        rom = self.headed()
+        seen: list[str] = []
+
+        def _source(name: str, _bypass: Path) -> tuple[Any, tuple[Any, ...]]:
+            seen.append(name)
+            return rom, ()
+
+        rebuild_all.main(
+            carts={"jp": {rebuild_all.PREFIGHT_VARIANT: b""}},
+            build=lambda region, name, _c: rebuild_all.OUT / f"{region}-{name}-bypass.sfc",
+            source_for=_source,
+            table_for=lambda _r: [],
+            say=lambda _l: None,
+        )
+
+        self.assertEqual(seen, [rebuild_all.PREFIGHT_VARIANT])
+
+
 if __name__ == "__main__":
     unittest.main()
