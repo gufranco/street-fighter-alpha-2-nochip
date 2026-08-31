@@ -470,5 +470,29 @@ class EntryTest(unittest.TestCase):
         self.assertTrue(said)
 
 
+class VanishedRunTest(unittest.TestCase):
+    """A run the survey saw and the patch cannot find.
+
+    One fix overwriting another's stock bytes is how this happens for real, and
+    the cartridge has no such pair, so the survey is supplied instead.
+    """
+
+    def test_a_run_that_is_no_longer_there_is_refused(self) -> None:
+        claimed = {fix.name: gamefixes.APPLIED for fix in gamefixes.FIXES}
+
+        with self.assertRaises(ValueError) as refusal:
+            gamefixes.apply(bytes(0x400000), claimed)
+
+        self.assertIn("was there at survey", str(refusal.exception))
+
+    def test_the_refusal_names_the_fix_that_went_missing(self) -> None:
+        claimed = {fix.name: gamefixes.APPLIED for fix in gamefixes.FIXES}
+
+        with self.assertRaises(ValueError) as refusal:
+            gamefixes.apply(bytes(0x400000), claimed)
+
+        self.assertIn(gamefixes.FIXES[0].name, str(refusal.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
