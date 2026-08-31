@@ -1,5 +1,6 @@
 import sys
 from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -81,15 +82,26 @@ def window(
     return cpu.disassemble(rom[: offset + forward], start, lorom_address(start), m=m, x=x)
 
 
-def main() -> int:
-    if len(sys.argv) < 3:
-        print("usage: sdd1sites.py <source-rom> <tagged-rom>", file=sys.stderr)
+def main(
+    argv: list[str] | None = None,
+    read: Callable[[Any], Any] | None = None,
+    say: Callable[..., None] = print,
+) -> int:
+    """Where the cartridge writes the chip's registers, and what surrounds them.
+
+    The arguments and the cartridge reader are parameters, so both refusals and
+    the report can be driven without a dump on the machine.
+    """
+    argv = sys.argv if argv is None else argv
+    read = dump.read if read is None else read
+    if len(argv) < 3:
+        say("usage: sdd1sites.py <source-rom> <tagged-rom>", file=sys.stderr)
         return 2
 
-    rom = dump.read(sys.argv[1])
-    entries = sdd1map.build_map(dump.read(sys.argv[2]))
+    rom = read(argv[1])
+    entries = sdd1map.build_map(read(argv[2]))
     mask = compressed_mask(rom, entries)
-    print(f"  compressed data covers {sum(mask):,} of {len(rom):,} bytes")
+    say(f"  compressed data covers {sum(mask):,} of {len(rom):,} bytes")
 
     found = find_register_writes(rom, mask)
     by_register: dict[int, list[Any]] = {}
@@ -97,20 +109,20 @@ def main() -> int:
         by_register.setdefault(item.register, []).append(item)
     for register in sorted(by_register):
         places = by_register[register]
-        print(
+        say(
             f"  ${register:04X} written from {len(places)} places: "
             f"{', '.join(f'${f.address:06X}' for f in places)}"
         )
 
-    print("\n  arm sites in detail")
+    say("\n  arm sites in detail")
     for item in [f for f in found if f.register == ARM_REGISTER]:
-        print(f"\n  === ${item.address:06X}  file {item.offset:#09x}")
+        say(f"\n  === ${item.address:06X}  file {item.offset:#09x}")
         for line in window(rom, item.offset):
             if line.offset < item.offset - 40:
                 continue
             mark = "   <<<" if line.offset == item.offset else ""
             raw = rom[line.offset : line.offset + line.size].hex(" ")
-            print(f"    ${line.address:06X}  {raw:<11} {line.text}{mark}")
+            say(f"    ${line.address:06X}  {raw:<11} {line.text}{mark}")
     return 0
 
 
