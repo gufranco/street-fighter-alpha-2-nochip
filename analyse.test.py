@@ -78,5 +78,95 @@ class EstimateTest(unittest.TestCase):
         self.assertEqual(an.mbit(1048576), 8.0)
 
 
+class MbitTest(unittest.TestCase):
+    """Sizes in the unit cartridges are sold in."""
+
+    def test_a_megabyte_is_eight_megabit(self) -> None:
+        self.assertEqual(an.mbit(1048576), 8)
+
+    def test_nothing_is_nothing(self) -> None:
+        self.assertEqual(an.mbit(0), 0)
+
+
+class ReportTest(unittest.TestCase):
+    """One line about one cartridge."""
+
+    def test_it_names_the_label_it_was_given(self) -> None:
+        said: list[str] = []
+
+        an.report("a cartridge", bytes(0x20000), said.append)
+
+        self.assertIn("a cartridge", said[0])
+
+    def test_flat_data_reports_no_compressed_bytes(self) -> None:
+        self.assertEqual(an.report("flat", bytes(0x20000), lambda _l: None), 0)
+
+    def test_random_data_reports_every_block_as_compressed(self) -> None:
+        import os
+
+        found = an.report("random", os.urandom(0x20000), lambda _l: None)
+
+        self.assertEqual(found, 2 * an.BLOCK)
+
+
+class CommandTest(unittest.TestCase):
+    """The projection, driven without four dumps on the machine."""
+
+    def run_with(self, roms: dict[str, bytes]) -> tuple[int, list[str]]:
+        said: list[str] = []
+        code = an.main(
+            ["an.py", "so_orig", "so_patched", "sfa2_final", "sfa2_proto"],
+            read=lambda path: roms[path.name],
+            say=said.append,
+        )
+        return code, said
+
+    @staticmethod
+    def four() -> dict[str, bytes]:
+        import os
+
+        return {
+            "so_orig": bytes(0x40000),
+            "so_patched": bytes(0x40000) + os.urandom(0x40000),
+            "sfa2_final": os.urandom(0x40000),
+            "sfa2_proto": bytes(0x40000),
+        }
+
+    def test_a_run_over_four_cartridges_succeeds(self) -> None:
+        code, _ = self.run_with(self.four())
+
+        self.assertEqual(code, 0)
+
+    def test_it_reports_the_whole_rom_growth_factor(self) -> None:
+        _, said = self.run_with(self.four())
+
+        self.assertIn("whole-ROM growth factor: 2.00x", "\n".join(said))
+
+    def test_it_counts_the_chunks_the_patch_added(self) -> None:
+        _, said = self.run_with(self.four())
+
+        self.assertIn("256/512", "\n".join(said))
+
+    def test_it_projects_one_line_per_expansion_ratio(self) -> None:
+        _, said = self.run_with(self.four())
+
+        self.assertEqual(len([one for one in said if "fits 128 Mbit" in one]), 3)
+
+    def test_a_projection_that_fits_says_so(self) -> None:
+        _, said = self.run_with(self.four())
+
+        self.assertIn("yes", "\n".join(said))
+
+    def test_a_projection_that_does_not_fit_says_no(self) -> None:
+        import os
+
+        roms = self.four()
+        roms["sfa2_final"] = os.urandom(0x1000000)
+
+        _, said = self.run_with(roms)
+
+        self.assertIn("NO", "\n".join(said))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
