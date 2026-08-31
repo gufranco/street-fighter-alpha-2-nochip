@@ -36,7 +36,7 @@ without one, and is above.
 def _unit_builds() -> bool:
     try:
         driver_run.ssmp.Chip("s-smp")
-    except Exception:
+    except (driver_run.ssmp.NoBootRom, driver_run.ssmp.Corrupt, OSError):
         return False
     return True
 
