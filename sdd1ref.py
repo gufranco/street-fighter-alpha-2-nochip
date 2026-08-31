@@ -1,7 +1,9 @@
 import random
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -55,15 +57,30 @@ def decode_response(blob: bytes, cases: list[tuple[int, int]]) -> list[bytes]:
     return parts
 
 
-def build_image(quiet: bool = True) -> int:
+def build_image(quiet: bool = True, execute: Callable[..., Any] = subprocess.run) -> int:
+    """Build the reference image, returning whatever the builder exited with.
+
+    The builder is a parameter so a caller can be driven without a container
+    runtime on the machine.
+    """
     stream = subprocess.DEVNULL if quiet else None
-    return subprocess.run(
+    returned: int = execute(
         build_image_command(), stdout=stream, stderr=stream, check=False
     ).returncode
+    return returned
 
 
-def reference_outputs(rom: bytes | bytearray, cases: list[tuple[int, int]]) -> list[bytes]:
-    result = subprocess.run(
+def reference_outputs(
+    rom: bytes | bytearray,
+    cases: list[tuple[int, int]],
+    execute: Callable[..., Any] = subprocess.run,
+) -> list[bytes]:
+    """Ask the C reference for one output per case.
+
+    The running is a parameter so the framing, which is the part worth testing,
+    can be driven against a recorded response.
+    """
+    result = execute(
         run_command(), input=encode_request(rom, cases), capture_output=True, check=False
     )
     if result.returncode != 0:
@@ -73,8 +90,17 @@ def reference_outputs(rom: bytes | bytearray, cases: list[tuple[int, int]]) -> l
     return decode_response(result.stdout, cases)
 
 
-def compare(rom: bytes | bytearray, cases: list[tuple[int, int]]) -> list[tuple[int, int, str]]:
-    expected = reference_outputs(rom, cases)
+def compare(
+    rom: bytes | bytearray,
+    cases: list[tuple[int, int]],
+    reference: Callable[..., list[bytes]] = reference_outputs,
+) -> list[tuple[int, int, str]]:
+    """Every case where this package and the C reference disagree.
+
+    The reference is a parameter so each kind of disagreement can be driven
+    without a container.
+    """
+    expected = reference(rom, cases)
     mismatches: list[tuple[int, int, str]] = []
     for (offset, length), want in zip(cases, expected, strict=True):
         try:
@@ -98,31 +124,45 @@ def sample_cases(rom: bytes | bytearray, count: int, seed: int) -> list[tuple[in
     return [(rng.randrange(limit), rng.choice(SAMPLE_LENGTHS)) for _ in range(count)]
 
 
-def main() -> int:
-    if len(sys.argv) < 2:
-        print("usage: sdd1ref.py <rom> [cases] [seed]", file=sys.stderr)
+def main(
+    argv: list[str] | None = None,
+    read: Callable[[Any], Any] | None = None,
+    build: Callable[[], int] = build_image,
+    check: Callable[..., list[tuple[int, int, str]]] = compare,
+    say: Callable[..., None] = print,
+) -> int:
+    """The command line, with every step that reaches outside passed in.
+
+    A run needs a cartridge and a container, so both are parameters and every
+    branch, including the two refusals and the mismatch report, can be driven
+    without either.
+    """
+    argv = sys.argv if argv is None else argv
+    read = dump.read if read is None else read
+    if len(argv) < 2:
+        say("usage: sdd1ref.py <rom> [cases] [seed]", file=sys.stderr)
         return 2
 
-    rom = dump.read(sys.argv[1])
-    count = int(sys.argv[2]) if len(sys.argv) > 2 else 500
-    seed = int(sys.argv[3]) if len(sys.argv) > 3 else 20260813
+    rom = read(argv[1])
+    count = int(argv[2]) if len(argv) > 2 else 500
+    seed = int(argv[3]) if len(argv) > 3 else 20260813
 
-    print(f"  building {IMAGE}", flush=True)
-    if build_image() != 0:
-        print("reference image failed to build", file=sys.stderr)
+    say(f"  building {IMAGE}")
+    if build() != 0:
+        say("reference image failed to build", file=sys.stderr)
         return 1
 
     cases = sample_cases(rom, count, seed)
-    print(f"  comparing {len(cases)} cases against the c reference", flush=True)
-    mismatches = compare(rom, cases)
+    say(f"  comparing {len(cases)} cases against the c reference")
+    mismatches = check(rom, cases)
 
     if mismatches:
         for offset, length, why in mismatches[:20]:
-            print(f"  MISMATCH {offset:#09x} len {length}: {why}")
-        print(f"[fail] {len(mismatches)}/{len(cases)} cases differ")
+            say(f"  MISMATCH {offset:#09x} len {length}: {why}")
+        say(f"[fail] {len(mismatches)}/{len(cases)} cases differ")
         return 1
 
-    print(f"[ok] {len(cases)} cases identical to snes9x {IMAGE.rsplit('-', maxsplit=1)[-1]}")
+    say(f"[ok] {len(cases)} cases identical to snes9x {IMAGE.rsplit('-', maxsplit=1)[-1]}")
     return 0
 
 

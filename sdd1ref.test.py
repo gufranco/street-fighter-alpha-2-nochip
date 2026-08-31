@@ -126,5 +126,144 @@ class DifferentialTest(unittest.TestCase):
         self.assert_agrees(rom, [(0x101010, 0)])
 
 
+class ShellOutTest(unittest.TestCase):
+    """The two steps that reach for a container, with the reaching passed in."""
+
+    class Exited:
+        def __init__(self, code: int, out: bytes = b"", err: bytes = b"") -> None:
+            self.returncode, self.stdout, self.stderr = code, out, err
+
+    def test_a_build_that_succeeds_reports_zero(self) -> None:
+        self.assertEqual(ref.build_image(execute=lambda *_a, **_k: self.Exited(0)), 0)
+
+    def test_a_build_that_fails_reports_what_the_builder_exited_with(self) -> None:
+        self.assertEqual(ref.build_image(execute=lambda *_a, **_k: self.Exited(3)), 3)
+
+    def test_a_noisy_build_lets_the_builder_write_to_the_terminal(self) -> None:
+        seen: list[Any] = []
+
+        def _record(_command: Any, **rest: Any) -> Any:
+            seen.append(rest["stdout"])
+            return self.Exited(0)
+
+        ref.build_image(quiet=False, execute=_record)
+
+        self.assertIsNone(seen[0])
+
+    def test_a_reference_that_fails_is_reported_rather_than_parsed(self) -> None:
+        with self.assertRaises(RuntimeError):
+            ref.reference_outputs(
+                bytes(1024), [(0, 16)], execute=lambda *_a, **_k: self.Exited(1, err=b"boom")
+            )
+
+    def test_a_reference_that_answers_is_split_into_one_output_per_case(self) -> None:
+        found = ref.reference_outputs(
+            bytes(1024),
+            [(0, 4), (8, 4)],
+            execute=lambda *_a, **_k: self.Exited(0, out=b"aaaabbbb"),
+        )
+
+        self.assertEqual(found, [b"aaaa", b"bbbb"])
+
+
+class CompareTest(unittest.TestCase):
+    """The three outcomes of comparing one case against the reference."""
+
+    ROM = bytes(0x400000)
+
+    def test_a_case_the_two_agree_on_is_not_a_mismatch(self) -> None:
+        want = ref.sdd1.decompress(self.ROM, 0x100000, 16).data
+
+        self.assertEqual(ref.compare(self.ROM, [(0x100000, 16)], lambda *_a: [want]), [])
+
+    def test_a_case_they_differ_on_names_the_first_differing_byte(self) -> None:
+        want = bytearray(ref.sdd1.decompress(self.ROM, 0x100000, 16).data)
+        want[3] ^= 0xFF
+
+        found = ref.compare(self.ROM, [(0x100000, 16)], lambda *_a: [bytes(want)])
+
+        self.assertEqual(found[0][2], "first differing byte at 3")
+
+    def test_a_case_this_package_cannot_decode_is_named_as_truncated(self) -> None:
+        found = ref.compare(self.ROM, [(0x3FFFFF, 8192)], lambda *_a: [bytes(8192)])
+
+        self.assertEqual(found[0][2], "truncated")
+
+
+class CommandTest(unittest.TestCase):
+    """The command line, driven without a cartridge or a container."""
+
+    ROM = bytes(0x400000)
+
+    def run_with(self, argv: list[str], **rest: Any) -> tuple[int, list[str]]:
+        said: list[str] = []
+        code = ref.main(
+            argv,
+            read=lambda _p: self.ROM,
+            say=lambda *args, **_k: said.append(str(args[0])),
+            **{"build": lambda: 0, "check": lambda *_a: [], **rest},
+        )
+        return code, said
+
+    def test_no_rom_named_prints_the_usage(self) -> None:
+        code, said = self.run_with(["sdd1ref.py"])
+
+        self.assertEqual((code, "usage" in said[0]), (2, True))
+
+    def test_a_build_that_fails_stops_the_run(self) -> None:
+        code, said = self.run_with(["sdd1ref.py", "rom"], build=lambda: 1)
+
+        self.assertEqual((code, "failed to build" in "\n".join(said)), (1, True))
+
+    def test_a_run_where_every_case_agrees_passes(self) -> None:
+        code, said = self.run_with(["sdd1ref.py", "rom", "3"])
+
+        self.assertEqual((code, "[ok] 3 cases" in "\n".join(said)), (0, True))
+
+    def test_a_seed_can_be_named_so_the_sample_repeats(self) -> None:
+        seen: list[list[tuple[int, int]]] = []
+
+        def _record(_rom: Any, cases: list[tuple[int, int]]) -> list[Any]:
+            seen.append(cases)
+            return []
+
+        for _ in range(2):
+            self.run_with(["sdd1ref.py", "rom", "3", "7"], check=_record)
+
+        self.assertEqual(seen[0], seen[1])
+
+    def test_a_run_with_a_mismatch_names_it_and_fails(self) -> None:
+        code, said = self.run_with(
+            ["sdd1ref.py", "rom", "1"], check=lambda *_a: [(0x100000, 16, "wrong")]
+        )
+
+        self.assertEqual((code, "MISMATCH" in "\n".join(said)), (1, True))
+
+    def test_only_the_first_twenty_mismatches_are_listed(self) -> None:
+        many = [(n, 16, "wrong") for n in range(30)]
+
+        _, said = self.run_with(["sdd1ref.py", "rom", "30"], check=lambda *_a: many)
+
+        self.assertEqual(len([one for one in said if "MISMATCH" in one]), 20)
+
+
+class SampleTest(unittest.TestCase):
+    """Choosing which streams to compare."""
+
+    def test_a_rom_too_small_to_hold_a_block_is_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            ref.sample_cases(bytes(16), 1, 1)
+
+    def test_the_same_seed_chooses_the_same_cases(self) -> None:
+        rom = bytes(0x100000)
+
+        self.assertEqual(ref.sample_cases(rom, 5, 1), ref.sample_cases(rom, 5, 1))
+
+    def test_every_length_it_chooses_is_one_it_was_offered(self) -> None:
+        cases = ref.sample_cases(bytes(0x100000), 20, 1)
+
+        self.assertTrue(all(length in ref.SAMPLE_LENGTHS for _, length in cases))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
