@@ -157,5 +157,21 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(tile_shape.main([]), 2)
 
 
+class ExhaustedTableTest(unittest.TestCase):
+    """A survey that runs out of streams rather than stopping at a limit."""
+
+    def test_a_table_shorter_than_the_limit_is_measured_whole(self) -> None:
+        table = list(tile_shape.table_for(USA))[:3]
+
+        found = tile_shape.against(USA, limit=100, table=table)
+
+        self.assertEqual(found.aligned + found.unaligned, len(table))
+
+    def test_a_table_with_no_stream_big_enough_measures_nothing(self) -> None:
+        found = tile_shape.against(USA, table=[(0x100000, tile_shape.SMALLEST - 1)])
+
+        self.assertEqual(found.aligned + found.unaligned, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

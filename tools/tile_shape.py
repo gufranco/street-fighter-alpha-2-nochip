@@ -138,11 +138,15 @@ def table_for(where: Path | str) -> Any:
     return module.STREAMS
 
 
-def against(where: Path | str, limit: int | None = None) -> Survey:
-    """Every stream the cartridge declares, decompressed and measured."""
+def against(where: Path | str, limit: int | None = None, table: Any = None) -> Survey:
+    """Every stream the cartridge declares, decompressed and measured.
+
+    The table is a parameter so a caller can measure a chosen set rather than
+    whichever one the cartridge name selects.
+    """
     rom = bytearray(Path(where).read_bytes())
     runs = []
-    for off, length in table_for(where):
+    for off, length in table_for(where) if table is None else table:
         if length < SMALLEST:
             continue
         found = sdd1.decompress(rom, off, length)
