@@ -292,5 +292,97 @@ class MainTest(unittest.TestCase):
         self.assertEqual(compare_audio.main(["compare_audio.py", "a.sfc", "b.sfc", "--roster"]), 2)
 
 
+class ShellOutTest(unittest.TestCase):
+    """The one step that reaches for a container, with the reaching passed in."""
+
+    def test_it_names_the_roster_and_the_budget(self) -> None:
+        asked: list[Any] = []
+
+        compare_audio.run(
+            compare_audio.ROOT / "build" / "all" / "probe.sfc",
+            roster=3,
+            budget=100,
+            execute=lambda command, **_rest: asked.append(command),
+        )
+
+        self.assertIn("SFTOURROSTER=3", asked[0])
+
+    def test_a_fights_run_asks_the_driver_to_confirm(self) -> None:
+        asked: list[Any] = []
+
+        compare_audio.run(
+            compare_audio.ROOT / "build" / "all" / "probe.sfc",
+            fights=True,
+            execute=lambda command, **_rest: asked.append(command),
+        )
+
+        self.assertIn("SFTOURCONFIRM=1", asked[0])
+
+    def test_a_plain_run_does_not(self) -> None:
+        asked: list[Any] = []
+
+        compare_audio.run(
+            compare_audio.ROOT / "build" / "all" / "probe.sfc",
+            execute=lambda command, **_rest: asked.append(command),
+        )
+
+        self.assertNotIn("SFTOURCONFIRM=1", asked[0])
+
+    def test_it_returns_the_log_it_wrote(self) -> None:
+        found = compare_audio.run(
+            compare_audio.ROOT / "build" / "all" / "probe.sfc", execute=lambda *_a, **_k: None
+        )
+
+        self.assertEqual(found.name, "audio-probe.txt")
+
+
+class CommandTest(unittest.TestCase):
+    """The verdict, driven against recorded logs."""
+
+    def run_with(self, argv: list[str], stock: str, patched: str) -> tuple[int, list[str]]:
+        where = Path(tempfile.mkdtemp())
+        said: list[str] = []
+
+        def _drive(image: Path, *_rest: Any, **_kw: Any) -> Path:
+            written = where / f"{image.stem}.txt"
+            written.write_text(stock if "stock" in image.stem else patched)
+            return written
+
+        code = compare_audio.main(
+            argv, drive=_drive, say=lambda *args, **_k: said.append(str(args[0]))
+        )
+        return code, said
+
+    def test_bad_arguments_print_the_usage(self) -> None:
+        code, said = self.run_with(["compare_audio.py"], CLEAN, CLEAN)
+
+        self.assertEqual((code, "usage" in "\n".join(said)), (2, True))
+
+    def test_a_patch_that_broke_nothing_passes(self) -> None:
+        code, said = self.run_with(["compare_audio.py", "stock.sfc", "patched.sfc"], CLEAN, FASTER)
+
+        self.assertEqual((code, "FAIL" in "\n".join(said)), (0, False))
+
+    def test_a_patch_that_stopped_uploading_a_source_fails(self) -> None:
+        code, said = self.run_with(["compare_audio.py", "stock.sfc", "patched.sfc"], CLEAN, SKIPPED)
+
+        self.assertEqual((code, "FAIL" in "\n".join(said)), (1, True))
+
+    def test_a_patch_that_corrupted_a_block_fails(self) -> None:
+        code, said = self.run_with(["compare_audio.py", "stock.sfc", "patched.sfc"], CLEAN, CORRUPT)
+
+        self.assertEqual((code, "did not arrive intact" in "\n".join(said)), (1, True))
+
+    def test_a_build_that_did_not_load_fails(self) -> None:
+        code, said = self.run_with(["compare_audio.py", "stock.sfc", "patched.sfc"], "", CLEAN)
+
+        self.assertEqual((code, "did not load" in "\n".join(said)), (1, True))
+
+    def test_both_builds_are_named_in_the_report(self) -> None:
+        _, said = self.run_with(["compare_audio.py", "stock.sfc", "patched.sfc"], CLEAN, FASTER)
+
+        self.assertIn("stock.sfc", said[0])
+
+
 if __name__ == "__main__":
     unittest.main()

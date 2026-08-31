@@ -40,6 +40,7 @@ import re
 import subprocess
 import sys
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -97,13 +98,23 @@ def options(argv: list[str]) -> tuple[str, str, int, int, bool]:
     return rest[0], rest[1], roster, budget, fights
 
 
-def run(image: Path, roster: int = ROSTER, budget: int = BUDGET, fights: bool = False) -> Path:
-    """Drive one image through the tour with every upload verified as it lands."""
+def run(
+    image: Path,
+    roster: int = ROSTER,
+    budget: int = BUDGET,
+    fights: bool = False,
+    execute: Callable[..., Any] = subprocess.run,
+) -> Path:
+    """Drive one image through the tour with every upload verified as it lands.
+
+    The reaching out is a parameter so the comparison, which is the part worth
+    testing, can be driven against recorded logs rather than a container.
+    """
     LOGS.mkdir(parents=True, exist_ok=True)
     image = Path(image).resolve()
     log = LOGS / f"audio-{image.stem}.txt"
     with log.open("wb") as handle:
-        subprocess.run(
+        execute(
             [
                 "docker",
                 "run",
@@ -222,50 +233,63 @@ def verdict(stock: dict[str, Any], patched: dict[str, Any]) -> list[str]:
 
 
 def report(
-    stock_name: str, patched_name: str, stock: dict[str, Any], patched: dict[str, Any]
+    stock_name: str,
+    patched_name: str,
+    stock: dict[str, Any],
+    patched: dict[str, Any],
+    say: Callable[[str], None] = print,
 ) -> None:
     """What each build did, and what the difference between them means."""
     for name, found in ((stock_name, stock), (patched_name, patched)):
-        print(
+        say(
             f"  {name:24s} load={found['load']:3s} frames={found['frames']:6d} "
             f"blocks={len(found['blocks']):5d} ok={found['ok']:5d} bad={found['bad']:3d} "
             f"writes/byte={cost(found):.3f}"
         )
 
     for entry in (stock["corrupt"] + patched["corrupt"])[:10]:
-        print(
+        say(
             f"    CORRUPT {entry['source']:#08x} to {entry['destination']:#06x}, "
             f"{entry['bad']} of {entry['length']} bytes wrong from byte {entry['first']}"
         )
 
     gone = missing(stock, patched)
     for source, length in gone[:10]:
-        print(f"    NEVER UPLOADED {source:#08x} for {length} bytes")
+        say(f"    NEVER UPLOADED {source:#08x} for {length} bytes")
 
-    print(f"    {len(fewer(stock, patched))} sources uploaded fewer times, {len(gone)} never")
+    say(f"    {len(fewer(stock, patched))} sources uploaded fewer times, {len(gone)} never")
     if cost(stock) and cost(patched):
-        print(f"    writes per byte went from {cost(stock):.3f} to {cost(patched):.3f}")
+        say(f"    writes per byte went from {cost(stock):.3f} to {cost(patched):.3f}")
 
 
-def main(argv: list[str]) -> int:
+def main(
+    argv: list[str],
+    drive: Callable[..., Path] = run,
+    say: Callable[..., None] = print,
+) -> int:
+    """Compare what two builds upload, and say whether the patch broke anything.
+
+    The driving is a parameter so both verdicts can be driven against recorded
+    logs rather than a container.
+    """
     try:
         stock, patched, roster, budget, fights = options(argv)
     except (Usage, IndexError, ValueError) as refusal:
-        print(f"  {refusal}", file=sys.stderr)
-        print(
+        say(f"  {refusal}", file=sys.stderr)
+        say(
             "usage: compare_audio.py [--fights] [--roster N] [--budget N] <stock> <patched>",
             file=sys.stderr,
         )
         return 2
 
     stock_path, patched_path = Path(stock), Path(patched)
-    stock_run = read(run(stock_path, roster, budget, fights))
-    patched_run = read(run(patched_path, roster, budget, fights))
+    stock_run = read(drive(stock_path, roster, budget, fights))
+    patched_run = read(drive(patched_path, roster, budget, fights))
 
-    report(stock_path.name, patched_path.name, stock_run, patched_run)
+    report(stock_path.name, patched_path.name, stock_run, patched_run, say)
     reasons = verdict(stock_run, patched_run)
     for reason in reasons:
-        print(f"    FAIL {reason}")
+        say(f"    FAIL {reason}")
     return 1 if reasons else 0
 
 
