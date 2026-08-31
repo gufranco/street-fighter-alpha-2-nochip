@@ -74,7 +74,7 @@ jobs:
       - name: Run every test module
         run: |
           failed=0
-          for module in *.test.py tools/*.test.py; do
+          for module in *.test.py tools/*.test.py conformance/*.test.py; do
             echo "::group::${module}"
             python3 "${module}" || failed=1
             echo "::endgroup::"

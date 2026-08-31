@@ -1,0 +1,71 @@
+{
+  "comment": "Where each fact stands, and what this package deliberately does not claim.",
+  "sources": {
+    "siblings": "Nine members on the import path, each held to its own suite: mos65xx, sony-spc700, sony-s-smp, sony-s-dsp, snes-sdd1, snes-mapper, snes-rom-image, snes-graphics and snes-driver.",
+    "cartridges": "The two retail images named in artifacts.manifest.json, each identified by four digests and neither carried here.",
+    "requests": "1,661 chip requests recorded by driving the Japanese cartridge on a model, which is what the Japanese stream table was built from.",
+    "thirdParty": "Patches published by other people, treated as claims to be checked rather than as sources."
+  },
+  "divergences": [
+    {
+      "id": "the-japanese-stream-table-cannot-be-proved-complete",
+      "parts": ["sdd1", "jpstreams"],
+      "severity": "medium",
+      "status": "narrowed",
+      "documentSays": "Nothing. No document lists what a cartridge asks its decompressor for.",
+      "referenceDoes": "n/a",
+      "packageFollows": "recording",
+      "reasoning": "A stream nobody asks for cannot be found by asking. The table satisfies all 1,661 recorded requests and the search converged, which is the strongest statement available and is not a proof of completeness. The USA table came from a tagged image and does not have this problem, so the gap is one cartridge wide rather than general.",
+      "wouldSettleIt": "A tagged Japanese image, or a run that reaches every screen in the game and records what each one asks for.",
+      "namedInDocument": "The Japanese stream table cannot be proved complete"
+    },
+    {
+      "id": "two-corrections-are-not-demonstrated-on-screen",
+      "parts": ["gamefixes"],
+      "severity": "medium",
+      "status": "acknowledged",
+      "documentSays": "n/a",
+      "referenceDoes": "n/a",
+      "packageFollows": "neither",
+      "reasoning": "The object table overflow needs eight simultaneous shadow frames and a projectile collision at once; the thrown father sprite sits in a scene no run here reaches. Both rest on reading the disassembly. The same runs do show that neither correction changes anything that is reached, which bounds the risk without demonstrating the benefit.",
+      "wouldSettleIt": "A recorded input sequence that reaches either scene, run before and after.",
+      "namedInDocument": "Two corrections are not demonstrated on screen"
+    },
+    {
+      "id": "a-published-patch-does-not-match-its-published-source",
+      "parts": ["spcfast"],
+      "severity": "low",
+      "status": "notADisagreement",
+      "documentSays": "n/a",
+      "referenceDoes": "A widely circulated patch ships assembly dated 2021-03-08 describing a two byte upload, and a binary dated 2022-10-21 whose audio driver reads three ports per handshake and self modifies its destinations.",
+      "packageFollows": "neither",
+      "reasoning": "The source and the binary in the same package describe different drivers, and the changelog entry naming two bytes predates both. Nothing here is derived from either, and the mismatch is recorded so that no later reader treats the published assembly as evidence about the shipped binary. A third party patch is never evidence about hardware in this family; here it is not evidence about itself either.",
+      "wouldSettleIt": "n/a. This is a note about a third party artifact, not an open question about the game.",
+      "namedInDocument": "A published patch is not evidence, including about itself"
+    },
+    {
+      "id": "the-boot-window-does-not-reach-this-driver",
+      "parts": ["ssmp"],
+      "severity": "low",
+      "status": "closed",
+      "documentSays": "The audio unit starts with its boot program covering the top sixty four bytes of memory, and the console switches that window off.",
+      "referenceDoes": "n/a",
+      "packageFollows": "document",
+      "reasoning": "An earlier reading here claimed the upload driver ran away when the window was left on. Running it both ways reaches the same bytes in the same cycles, because this driver never reads the addresses the window covers. The window is still switched off, because that is the state a console leaves it in, and a test holds the measurement so a patch that does reach up there shows the difference rather than hiding it.",
+      "wouldSettleIt": "n/a. Measured and closed.",
+      "namedInDocument": "The boot window does not reach the upload driver"
+    },
+    {
+      "id": "nothing-here-models-hardware",
+      "parts": ["sfa2"],
+      "severity": "low",
+      "status": "notModelled",
+      "documentSays": "n/a",
+      "referenceDoes": "n/a",
+      "packageFollows": "neither",
+      "reasoning": "This decompresses streams ahead of time, refits what is left into a map without a coprocessor, and patches code. Every claim about what a part does is made by one of the nine members it calls, each answering to its own suite. The one thing this measures directly is how many cycles a patched driver spends, and it measures that by running it on the audio unit rather than by counting from a table.",
+      "wouldSettleIt": "n/a. This is a scope boundary rather than an unknown.",
+      "namedInDocument": "Nothing here models hardware"
+    }
+  ]
+}
