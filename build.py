@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -12,7 +13,7 @@ class ToolchainMissing(Exception):
     """The program that builds and runs the container is not on PATH."""
 
 
-def build_image_command():
+def build_image_command() -> list[str]:
     return [
         "docker",
         "build",
@@ -22,7 +23,7 @@ def build_image_command():
     ]
 
 
-def patch_command(work_dir, patch_name, rom_name):
+def patch_command(work_dir: Path | str, patch_name: str, rom_name: str) -> list[str]:
     return [
         "docker",
         "run",
@@ -36,7 +37,7 @@ def patch_command(work_dir, patch_name, rom_name):
     ]
 
 
-def stage_rom(source, work_dir, output_name):
+def stage_rom(source: Path | str, work_dir: Path | str, output_name: str) -> Path:
     target = Path(work_dir) / output_name
     if target.resolve() == Path(source).resolve():
         raise ValueError("refusing to patch the source ROM in place")
@@ -44,7 +45,7 @@ def stage_rom(source, work_dir, output_name):
     return target
 
 
-def missing_message(program):
+def missing_message(program: str) -> str:
     return (
         f"{program} is not on PATH, and this build needs it. "
         f"The assembler runs in a container so its version is pinned; "
@@ -53,7 +54,11 @@ def missing_message(program):
     )
 
 
-def run(args, execute=None, say=print):
+def run(
+    args: list[str],
+    execute: Callable[[list[str]], int] | None = None,
+    say: Callable[[str], None] = print,
+) -> int:
     """One command, printed before it runs so a failing build says what it ran."""
     say("  $ " + " ".join(args))
     if execute is None:
@@ -64,15 +69,20 @@ def run(args, execute=None, say=print):
         raise ToolchainMissing(missing_message(args[0])) from absent
 
 
-def _shell_out(args):
+def _shell_out(args: list[str]) -> int:
     return subprocess.run(args, text=True, check=False).returncode
 
 
-def wants_image_only(argv):
+def wants_image_only(argv: list[str]) -> bool:
     return len(argv) == 2 and argv[1] == "--image"
 
 
-def main(argv=None, execute=None, say=print, complain=None):
+def main(
+    argv: list[str] | None = None,
+    execute: Callable[[list[str]], int] | None = None,
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """The command line, with the shelling out passed in so it can be checked."""
     argv = sys.argv if argv is None else argv
     complain = say if complain is None else complain
@@ -101,7 +111,7 @@ def main(argv=None, execute=None, say=print, complain=None):
     return code
 
 
-def cli():
+def cli() -> int:
     try:
         return main()
     except ToolchainMissing as absent:

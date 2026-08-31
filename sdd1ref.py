@@ -18,15 +18,15 @@ MAX_LENGTH = sdd1.MAX_LENGTH
 SAMPLE_LENGTHS = (1, 2, 15, 16, 17, 64, 832, 2048, 8192)
 
 
-def build_image_command():
+def build_image_command() -> list[str]:
     return ["docker", "build", "--tag", IMAGE, str(REF_DIR)]
 
 
-def run_command():
+def run_command() -> list[str]:
     return ["docker", "run", "--rm", "--interactive", "--network=none", IMAGE]
 
 
-def encode_request(rom, cases):
+def encode_request(rom: bytes | bytearray, cases: list[tuple[int, int]]) -> bytes:
     parts = [
         len(rom).to_bytes(4, "little"),
         bytes(rom),
@@ -42,8 +42,8 @@ def encode_request(rom, cases):
     return b"".join(parts)
 
 
-def decode_response(blob, cases):
-    parts = []
+def decode_response(blob: bytes, cases: list[tuple[int, int]]) -> list[bytes]:
+    parts: list[bytes] = []
     pos = 0
     for _, length in cases:
         size = length if length else MAX_LENGTH
@@ -55,14 +55,14 @@ def decode_response(blob, cases):
     return parts
 
 
-def build_image(quiet=True):
+def build_image(quiet: bool = True) -> int:
     stream = subprocess.DEVNULL if quiet else None
     return subprocess.run(
         build_image_command(), stdout=stream, stderr=stream, check=False
     ).returncode
 
 
-def reference_outputs(rom, cases):
+def reference_outputs(rom: bytes | bytearray, cases: list[tuple[int, int]]) -> list[bytes]:
     result = subprocess.run(
         run_command(), input=encode_request(rom, cases), capture_output=True, check=False
     )
@@ -73,9 +73,9 @@ def reference_outputs(rom, cases):
     return decode_response(result.stdout, cases)
 
 
-def compare(rom, cases):
+def compare(rom: bytes | bytearray, cases: list[tuple[int, int]]) -> list[tuple[int, int, str]]:
     expected = reference_outputs(rom, cases)
-    mismatches = []
+    mismatches: list[tuple[int, int, str]] = []
     for (offset, length), want in zip(cases, expected, strict=True):
         try:
             got = sdd1.decompress(rom, offset, length).data
@@ -90,7 +90,7 @@ def compare(rom, cases):
     return mismatches
 
 
-def sample_cases(rom, count, seed):
+def sample_cases(rom: bytes | bytearray, count: int, seed: int) -> list[tuple[int, int]]:
     limit = len(rom) - MAX_LENGTH
     if limit < 1:
         raise ValueError("the rom is too small to sample compressed streams from")

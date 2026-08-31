@@ -2,6 +2,7 @@ import sys
 import zlib
 from collections import namedtuple
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -22,11 +23,11 @@ MIN_DISTINCT = 10
 Hit = namedtuple("Hit", "source target length")
 
 
-def window_hash(value, bits):
+def window_hash(value: bytes | bytearray, bits: int) -> int:
     return zlib.crc32(value) & ((1 << bits) - 1)
 
 
-def build_bitmap(data, window, bits):
+def build_bitmap(data: bytes | bytearray, window: int, bits: int) -> bytearray:
     bitmap = bytearray((1 << bits) // 8)
     slot_of = window_hash
     for i in range(len(data) - window + 1):
@@ -35,16 +36,22 @@ def build_bitmap(data, window, bits):
     return bitmap
 
 
-def probe(bitmap, value, bits):
+def probe(bitmap: bytearray, value: bytes | bytearray, bits: int) -> bool:
     slot = window_hash(value, bits)
     return bool(bitmap[slot >> 3] >> (slot & 7) & 1)
 
 
-def is_distinctive(blob, minimum=MIN_DISTINCT):
+def is_distinctive(blob: bytes | bytearray, minimum: int = MIN_DISTINCT) -> bool:
     return len(set(blob)) >= minimum
 
 
-def extend(source, reference, offset, target, limit=EXTEND_LENGTH):
+def extend(
+    source: bytes | bytearray,
+    reference: bytes | bytearray,
+    offset: int,
+    target: int,
+    limit: int = EXTEND_LENGTH,
+) -> int:
     confirmed = CONFIRM_LENGTH
     length = CONFIRM_LENGTH
     while length < limit:
@@ -59,13 +66,19 @@ def extend(source, reference, offset, target, limit=EXTEND_LENGTH):
     return confirmed
 
 
-def find_streams(source, reference, start=0, stop=None, progress=None):
+def find_streams(
+    source: bytes | bytearray,
+    reference: bytes | bytearray,
+    start: int = 0,
+    stop: int | None = None,
+    progress: Any = None,
+) -> list[Any]:
     stop = len(source) if stop is None else stop
     probe_map = build_bitmap(reference, PROBE_LENGTH, PROBE_BITS)
     confirm_map = build_bitmap(reference, CONFIRM_LENGTH, CONFIRM_BITS)
     decompress = sdd1.decompress
     truncated = sdd1.TruncatedStream
-    hits = []
+    hits: list[Any] = []
 
     for offset in range(start, stop):
         if progress is not None and offset % 250000 == 0:
@@ -94,10 +107,10 @@ def find_streams(source, reference, start=0, stop=None, progress=None):
     return hits
 
 
-def chains(hits, tolerance=2):
+def chains(hits: list[Any], tolerance: int = 2) -> list[Any]:
     ordered = sorted(hits, key=lambda hit: hit.source)
-    runs = []
-    current = []
+    runs: list[Any] = []
+    current: list[Any] = []
     for hit in ordered:
         if current:
             last = current[-1]
@@ -128,7 +141,7 @@ def main() -> int:
     print(f"  reference {sys.argv[2]} {len(reference):,} bytes")
     print(f"  scanning {start:#x}..{stop:#x}", flush=True)
 
-    def report(offset, found):
+    def report(offset: int, found: int) -> None:
         print(f"    at {offset:#09x}  hits so far {found}", flush=True)
 
     hits = find_streams(source, reference, start, stop, progress=report)

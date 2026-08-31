@@ -41,6 +41,7 @@ import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -61,7 +62,7 @@ BLOCKS = re.compile(r"^BLOCKS ok=(\d+) bad=(\d+)")
 RESULT = re.compile(r"^RESULT load=(\w+) frames=(\d+)")
 
 
-def mapping_for(stem):
+def mapping_for(stem: str) -> str:
     """Which map an image is read through, decided by the form it was built in."""
     return FREE_MAPPING if stem.endswith("-free") else CART_MAPPING
 
@@ -70,7 +71,7 @@ class Usage(Exception):
     pass
 
 
-def options(argv):
+def options(argv: list[str]) -> tuple[str, str, int, int, bool]:
     """The tour to drive, and the two images to drive through it.
 
     The default tour walks the roster, and every character loads a different
@@ -96,7 +97,7 @@ def options(argv):
     return rest[0], rest[1], roster, budget, fights
 
 
-def run(image, roster=ROSTER, budget=BUDGET, fights=False):
+def run(image: Path, roster: int = ROSTER, budget: int = BUDGET, fights: bool = False) -> Path:
     """Drive one image through the tour with every upload verified as it lands."""
     LOGS.mkdir(parents=True, exist_ok=True)
     image = Path(image).resolve()
@@ -131,7 +132,7 @@ def run(image, roster=ROSTER, budget=BUDGET, fights=False):
     return log
 
 
-def read(log):
+def read(log: Path) -> dict[str, Any]:
     """What one run uploaded, and whether all of it arrived."""
     blocks = []
     corrupt = []
@@ -180,12 +181,12 @@ def read(log):
     }
 
 
-def uploads(found):
+def uploads(found: dict[str, Any]) -> Counter[tuple[int, int]]:
     """How many times each source block was uploaded."""
     return Counter((block["source"], block["length"]) for block in found["blocks"])
 
 
-def fewer(stock, patched):
+def fewer(stock: dict[str, Any], patched: dict[str, Any]) -> dict[Any, Any]:
     """Sources the patched build uploaded fewer times than the stock one."""
     before, after = uploads(stock), uploads(patched)
     return {
@@ -195,20 +196,20 @@ def fewer(stock, patched):
     }
 
 
-def missing(stock, patched):
+def missing(stock: dict[str, Any], patched: dict[str, Any]) -> list[Any]:
     """Sources the stock build uploaded and the patched one never did at all."""
     after = uploads(patched)
     return [source for source in uploads(stock) if source not in after]
 
 
-def cost(found):
+def cost(found: dict[str, Any]) -> float:
     """Writes per byte uploaded, which is what a faster loop is meant to lower."""
     written = sum(block["writes"] for block in found["blocks"])
     length = sum(block["length"] for block in found["blocks"])
     return written / length if length else 0.0
 
 
-def verdict(stock, patched):
+def verdict(stock: dict[str, Any], patched: dict[str, Any]) -> list[str]:
     """Whatever the patch did that is a defect rather than an improvement."""
     reasons = []
     if stock["load"] != "ok" or patched["load"] != "ok":
@@ -220,7 +221,9 @@ def verdict(stock, patched):
     return reasons
 
 
-def report(stock_name, patched_name, stock, patched):
+def report(
+    stock_name: str, patched_name: str, stock: dict[str, Any], patched: dict[str, Any]
+) -> None:
     """What each build did, and what the difference between them means."""
     for name, found in ((stock_name, stock), (patched_name, patched)):
         print(
@@ -256,11 +259,11 @@ def main(argv: list[str]) -> int:
         return 2
 
     stock_path, patched_path = Path(stock), Path(patched)
-    stock = read(run(stock_path, roster, budget, fights))
-    patched = read(run(patched_path, roster, budget, fights))
+    stock_run = read(run(stock_path, roster, budget, fights))
+    patched_run = read(run(patched_path, roster, budget, fights))
 
-    report(stock_path.name, patched_path.name, stock, patched)
-    reasons = verdict(stock, patched)
+    report(stock_path.name, patched_path.name, stock_run, patched_run)
+    reasons = verdict(stock_run, patched_run)
     for reason in reasons:
         print(f"    FAIL {reason}")
     return 1 if reasons else 0

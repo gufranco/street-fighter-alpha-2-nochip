@@ -2,6 +2,7 @@ import importlib.util
 import json
 import sys
 from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -43,15 +44,17 @@ DIGEST_COMMANDS = (
 )
 
 
-def digests(data):
+def digests(data: bytes | bytearray) -> Any:
     return Identity(**romimage.identity.measure(data))
 
 
-def read_manifest(path=MANIFEST_PATH):
-    return json.loads(Path(path).read_text())
+def read_manifest(path: Path | str = MANIFEST_PATH) -> dict[str, Any]:
+    found = json.loads(Path(path).read_text())
+    assert isinstance(found, dict)
+    return found
 
 
-def accepted_digests(manifest):
+def accepted_digests(manifest: dict[str, Any]) -> dict[str, Any]:
     return {
         accepted["sha256"]: artifact
         for artifact in manifest["artifacts"]
@@ -59,15 +62,15 @@ def accepted_digests(manifest):
     }
 
 
-def known_bad_digests(manifest):
+def known_bad_digests(manifest: dict[str, Any]) -> dict[str, Any]:
     return {entry["sha256"]: entry for entry in manifest.get("known_bad", [])}
 
 
-def source_form(raw):
+def source_form(raw: bytes | bytearray) -> str:
     return "copier header, stripped" if romimage.dump.has_copier_stub(raw) else "bare"
 
 
-def diagnose(artifact, manifest, roms=ROMS):
+def diagnose(artifact: dict[str, Any], manifest: dict[str, Any], roms: Path = ROMS) -> Any:
     name = artifact["name"]
     filename = artifact["filename"]
     path = Path(roms) / filename
@@ -105,7 +108,7 @@ def diagnose(artifact, manifest, roms=ROMS):
     return Finding(name, filename, STATE_WRONG_CONTENT, detail, identity, form)
 
 
-def repair_hint(finding):
+def repair_hint(finding: Any) -> str:
     if finding.state == STATE_WRONG_SIZE:
         return "if this came from a copier or a split set, join or strip it and try again"
     if finding.state == STATE_WRONG_CONTENT:
@@ -117,7 +120,7 @@ def repair_hint(finding):
     return ""
 
 
-def explain(finding):
+def explain(finding: Any) -> str:
     lines = [f"  {finding.filename}: {finding.state}  [{finding.name}]"]
     if finding.detail:
         lines.append(f"      {finding.detail}")
@@ -134,11 +137,11 @@ def explain(finding):
     return "\n".join(lines)
 
 
-def blocking(finding):
+def blocking(finding: Any) -> bool:
     return finding.state in BLOCKING_STATES
 
 
-def run(manifest, roms=ROMS, wanted=()):
+def run(manifest: dict[str, Any], roms: Path = ROMS, wanted: tuple[str, ...] = ()) -> list[Any]:
     return [
         diagnose(artifact, manifest, roms)
         for artifact in manifest["artifacts"]
@@ -146,7 +149,12 @@ def run(manifest, roms=ROMS, wanted=()):
     ]
 
 
-def main(argv, manifest=None, say=print, complain=None):
+def main(
+    argv: list[str],
+    manifest: dict[str, Any] | None = None,
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+) -> int:
     """Every declared dump checked, with both streams passed in so a run can be tested."""
     complain = say if complain is None else complain
     manifest = read_manifest() if manifest is None else manifest

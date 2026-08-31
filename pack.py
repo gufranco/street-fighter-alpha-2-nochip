@@ -3,6 +3,7 @@ import importlib.util
 import subprocess
 import sys
 from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hardware
 
 
-def load_images(load=hardware.load):
+def load_images(load: Callable[[str], Any] = hardware.load) -> Any:
     """The image handling model, or the reason a tree without it cannot go on.
 
     A submodule is a pinned commit rather than content, so a clone without them
@@ -73,15 +74,17 @@ DIST = ROOT / "dist"
 MANIFEST = "SHA256SUMS"
 
 
-def output_name(region, release=None):
-    return version.stamped(f"{REGIONS[region].title}-nochip", release)
+def output_name(region: str, release: str | None = None) -> str:
+    found = version.stamped(f"{REGIONS[region].title}-nochip", release)
+    assert isinstance(found, str)
+    return found
 
 
-def manifest_line(name, image):
+def manifest_line(name: str, image: bytes | bytearray) -> str:
     return f"{hashlib.sha256(image).hexdigest()}  {name}"
 
 
-def entries_for(region):
+def entries_for(region: str) -> Any:
     table = jpstreams.STREAMS if region == "jp" else usastreams.STREAMS
     return rombuild.entries_from_map({str(source): length for source, length in table})
 
@@ -90,7 +93,7 @@ class AssemblyFailed(Exception):
     """The bypass patch did not assemble, carrying what the assembler said."""
 
 
-def assembly_failure(region, result):
+def assembly_failure(region: str, result: Any) -> str:
     said = [
         f"the {region} bypass patch did not assemble: build.py exited {result.returncode}",
         "",
@@ -104,7 +107,7 @@ def assembly_failure(region, result):
     return "\n".join(said)
 
 
-def assemble_command(region, staged, produced_name):
+def assemble_command(region: str, staged: Path, produced_name: str) -> list[str]:
     """What assembling one region's bypass patch shells out to."""
     return [
         sys.executable,
@@ -115,11 +118,16 @@ def assemble_command(region, staged, produced_name):
     ]
 
 
-def _shell_out(args):
+def _shell_out(args: list[str]) -> Any:
     return subprocess.run(args, cwd=ROOT, check=False, capture_output=True, text=True)
 
 
-def assemble_bypass(region, cart, workdir, execute=_shell_out):
+def assemble_bypass(
+    region: str,
+    cart: bytes | bytearray,
+    workdir: Path,
+    execute: Callable[[list[str]], Any] = _shell_out,
+) -> bytes:
     staged = workdir / f"{region}-patched.sfc"
     staged.write_bytes(cart)
     produced_name = f"{region}-bypass.sfc"
@@ -132,16 +140,26 @@ def assemble_bypass(region, cart, workdir, execute=_shell_out):
     return image
 
 
-def build(region, workdir):
+def build(region: str, workdir: Path) -> bytes:
     retail = dump.read(REGIONS[region].retail)
     cart = repeatload.apply(gamefixes.apply(shinakuma.apply(spcfast.apply(retail))))
     bypass = prefight.apply(assemble_bypass(region, cart, workdir))
     extra = ((prefight.TABLE_ADDRESS, prefight.table()),)
     image = rombuild.build(bypass, entries_for(region), extra=extra).image
-    return rewrite.declare_rom_only(image)
+    assert isinstance(image, bytes)
+    declared = rewrite.declare_rom_only(image)
+    assert isinstance(declared, bytes)
+    return declared
 
 
-def main(argv, make=None, gate_check=None, say=print, complain=None, dist=None):
+def main(
+    argv: list[str],
+    make: Any = None,
+    gate_check: Any = None,
+    say: Callable[[str], None] = print,
+    complain: Callable[[str], None] | None = None,
+    dist: Path | None = None,
+) -> int:
     """Every region built, with the two slow steps passed in so a run can be checked."""
     complain = say if complain is None else complain
     make = build if make is None else make

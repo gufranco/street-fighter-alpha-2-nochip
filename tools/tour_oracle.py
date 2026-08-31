@@ -40,7 +40,7 @@ PASSES = (
 )
 
 
-def run(name, extra, frames):
+def run(name: str, extra: list[str], frames: int) -> dict[int, int]:
     log = ROOT / "build" / "harvest" / f"tour-{name}.txt"
     with log.open("wb") as handle:
         subprocess.run(
@@ -68,7 +68,7 @@ def run(name, extra, frames):
     return requests(log.read_text(errors="replace").splitlines())
 
 
-def requests(lines):
+def requests(lines: list[str]) -> dict[int, int]:
     """Every decompression the cartridge asked for, and the largest it asked for.
 
     Only transfers whose source address never advances are decompressions, which
@@ -76,7 +76,7 @@ def requests(lines):
     window are cartridge data. A transfer from below the window is the game
     moving something else, and counting it would put fiction into the table.
     """
-    wanted = {}
+    wanted: dict[int, int] = {}
     for line in lines:
         found = DMA.match(line)
         if not found:
@@ -91,12 +91,12 @@ def requests(lines):
 
 def main() -> int:
     rom = dump.read(RETAIL)
-    table = {}
+    table: dict[int, int] = {}
     for line in TABLE.read_text().splitlines():
-        source, length = line.split()
-        table[int(source)] = int(length)
+        written_source, written_length = line.split()
+        table[int(written_source)] = int(written_length)
 
-    seen = {}
+    seen: dict[int, int] = {}
     for name, extra, frames in PASSES:
         wanted = run(name, extra, frames)
         seen.update({s: max(seen.get(s, 0), n) for s, n in wanted.items()})

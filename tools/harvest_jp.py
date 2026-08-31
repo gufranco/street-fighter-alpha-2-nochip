@@ -44,7 +44,7 @@ SCAN = re.compile(
 SCANLEN = re.compile(r"^SCANLEN addr=(\w{4}) steps=(\d+)")
 
 
-def variants(retail):
+def variants(retail: bytes | bytearray) -> dict[str, bytes]:
     fast = spcfast.apply(retail)
     return {
         "base": retail,
@@ -54,7 +54,7 @@ def variants(retail):
     }
 
 
-def build_image(cart, table, name):
+def build_image(cart: bytes | bytearray, table: dict[int, int], name: str) -> Path:
     OUT.mkdir(parents=True, exist_ok=True)
     staged = OUT / f"jp-{name}-cart.sfc"
     staged.write_bytes(cart)
@@ -82,7 +82,7 @@ def build_image(cart, table, name):
     return free
 
 
-def scan_log(image):
+def scan_log(image: Path) -> list[str]:
     log = OUT / f"{image.stem}-scan.txt"
     with log.open("wb") as handle:
         subprocess.run(
@@ -111,8 +111,8 @@ def scan_log(image):
     return log.read_text(errors="replace").splitlines()
 
 
-def missed_streams(lines):
-    wanted = {}
+def missed_streams(lines: list[str]) -> dict[int, int]:
+    wanted: dict[int, int] = {}
     for index, line in enumerate(lines):
         found = SCANLEN.match(line)
         if not found or int(found.group(2)) <= SCAN_BUDGET:
@@ -135,11 +135,13 @@ def missed_streams(lines):
     return wanted
 
 
-def compressed_end(rom, source, length):
-    return sdd1.decompress(rom, source, length).end
+def compressed_end(rom: bytes | bytearray, source: int, length: int) -> int:
+    end = sdd1.decompress(rom, source, length).end
+    assert isinstance(end, int)
+    return end
 
 
-def shorten_to(rom, source, length, boundary):
+def shorten_to(rom: bytes | bytearray, source: int, length: int, boundary: int) -> int | None:
     low, high = 1, length
     best = None
     while low <= high:
@@ -155,7 +157,7 @@ def shorten_to(rom, source, length, boundary):
     return best
 
 
-def absorb(rom, table, source, length):
+def absorb(rom: bytes | bytearray, table: dict[int, int], source: int, length: int) -> bool:
     for other in sorted(table):
         if other >= source:
             break
@@ -171,7 +173,7 @@ def absorb(rom, table, source, length):
     return True
 
 
-def main() -> int:
+def main() -> dict[int, int]:
     rom = dump.read(RETAIL)
     table = dict(load("jpstreams").STREAMS)
     carts = variants(rom)

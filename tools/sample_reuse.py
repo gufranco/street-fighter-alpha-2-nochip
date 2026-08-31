@@ -1,7 +1,9 @@
 import re
 import sys
 from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -21,7 +23,7 @@ SPC_CYCLES_PER_BYTE = 16.3
 SPC_CLOCK = 1024000
 
 
-def events(lines):
+def events(lines: list[str]) -> Iterator[dict[str, Any]]:
     for line in lines:
         match = GROUP.match(line)
         if match:
@@ -48,9 +50,9 @@ def events(lines):
             }
 
 
-def loads(stream):
-    current = None
-    tail = []
+def loads(stream: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+    current: dict[str, Any] | None = None
+    tail: list[Any] = []
     for event in stream:
         if event["kind"] == "block":
             if current is not None:
@@ -80,19 +82,19 @@ def loads(stream):
         yield current
 
 
-def spans(load):
+def spans(load: dict[str, Any]) -> list[tuple[str, int]]:
     return [(span["name"], span["width"]) for span in load["spans"]]
 
 
-def request(load):
+def request(load: dict[str, Any]) -> Any:
     for mark in load["marks"]:
         if mark["pc"] == WALK_START:
             return mark["ids"]
     return None
 
 
-def replay(runs):
-    provenance = [None] * APU_RAM
+def replay(runs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    provenance: list[Any] = [None] * APU_RAM
     totals = {"loads": 0, "blocks": 0, "bytes": 0, "resident_blocks": 0, "resident_bytes": 0}
     per_load = []
     for run in runs:
@@ -132,8 +134,8 @@ def replay(runs):
     return totals, per_load
 
 
-def group_costs(runs):
-    costs = defaultdict(lambda: {"walks": 0, "bytes": 0})
+def group_costs(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    costs: dict[str, dict[str, int]] = defaultdict(lambda: {"walks": 0, "bytes": 0})
     for run in runs:
         for name, width in spans(run):
             costs[name]["walks"] += 1
@@ -141,20 +143,21 @@ def group_costs(runs):
     return costs
 
 
-def base_span(run):
+def base_span(run: dict[str, Any]) -> dict[str, Any] | None:
     for span in run["spans"]:
         if span["name"] == "base":
-            return span
+            found: dict[str, Any] = span
+            return found
     return None
 
 
-def base_identity(span):
+def base_identity(span: dict[str, Any]) -> tuple[Any, ...]:
     return tuple(
         (block["bank"], block["src"], block["length"], block["dest"]) for block in span["blocks"]
     )
 
 
-def base_repeats(runs):
+def base_repeats(runs: list[dict[str, Any]]) -> dict[str, Any]:
     found = {
         "loads": 0,
         "repeats": 0,
@@ -164,8 +167,8 @@ def base_repeats(runs):
         "resident_not_repeat": 0,
         "repeat_not_resident": 0,
     }
-    previous = None
-    previous_id = None
+    previous: tuple[Any, ...] | None = None
+    previous_id: Any = None
     for run in runs:
         span = base_span(run)
         if span is None or not span["bytes"]:
@@ -191,18 +194,18 @@ def base_repeats(runs):
     return found
 
 
-def seconds(count):
+def seconds(count: int) -> float:
     return count * SPC_CYCLES_PER_BYTE / SPC_CLOCK
 
 
-def report(name, text):
+def report(name: str, text: str) -> dict[str, Any]:
     runs = list(loads(events(text.splitlines())))
     totals, per_load = replay(runs)
     carrying = [entry for entry in per_load if entry["bytes"]]
     heavy = [entry for entry in carrying if entry["bytes"] >= 20000]
     heavy_resident = [entry for entry in heavy if entry["bytes"] == entry["resident"]]
     repeats = 0
-    previous = None
+    previous: dict[str, Any] | None = None
     for entry in carrying:
         if (
             previous is not None
@@ -237,7 +240,7 @@ def report(name, text):
         f"{again['bytes']} bytes, {seconds(again['bytes']):.1f} s"
     )
     costs = group_costs(runs)
-    skippable = defaultdict(lambda: {"spans": 0, "bytes": 0})
+    skippable: dict[str, dict[str, int]] = defaultdict(lambda: {"spans": 0, "bytes": 0})
     for run in runs:
         for span in run["spans"]:
             if span["bytes"] and span["bytes"] == span["resident"]:

@@ -31,7 +31,7 @@ def load(name: str) -> Any:
     return module
 
 
-def assemble(region):
+def assemble(region: str) -> Any:
     output = f"probe-{region}.sfc"
     subprocess.run(
         [sys.executable, "build.py", SOURCE, str(RETAIL[region].relative_to(ROOT)), output],
@@ -42,8 +42,9 @@ def assemble(region):
     return dump.read(ROOT / "asm" / output)
 
 
-def differing_runs(before, after):
-    found, start = [], None
+def differing_runs(before: bytes | bytearray, after: bytes | bytearray) -> list[tuple[int, bytes]]:
+    found: list[tuple[int, bytes]] = []
+    start: int | None = None
     for index in range(len(before)):
         if index in CHECKSUM_FIELD:
             if start is not None:
@@ -61,7 +62,7 @@ def differing_runs(before, after):
     return found
 
 
-def render(runs):
+def render(runs: list[tuple[int, bytes]]) -> str:
     lines = ["PATCH = ("]
     for at, data in runs:
         text = data.hex()
@@ -84,7 +85,7 @@ FRAME_HOOK = bytes.fromhex("")
 FRAME_HOOK_SITES = (0x000208, 0x00020C)
 
 
-def frame_hook_site(rom):
+def frame_hook_site(rom: bytes | bytearray) -> int | None:
     for site in FRAME_HOOK_SITES:
         window = rom[site : site + len(JOYPAD_WAIT)]
         if window == JOYPAD_WAIT or window[: len(FRAME_HOOK)] == FRAME_HOOK:
@@ -92,7 +93,7 @@ def frame_hook_site(rom):
     raise ValueError("the frame interrupt's joypad wait is at neither known position")
 
 
-def runs_for(rom):
+def runs_for(rom: bytes | bytearray) -> list[tuple[int, bytes]]:
     if not FRAME_HOOK:
         return PATCH
     return (*PATCH, (frame_hook_site(rom), FRAME_HOOK))
@@ -101,7 +102,7 @@ def runs_for(rom):
 """
 
 
-def add_plumbing(source):
+def add_plumbing(source: str) -> str:
     if "FRAME_HOOK_SITES" in source:
         return source
     source = source.replace("def checksum(rom):", PLUMBING + "def checksum(rom):", 1)
@@ -123,7 +124,12 @@ def add_plumbing(source):
     )
 
 
-def rewrite(source, shared, hook_body, hook_sites):
+def rewrite(
+    source: str,
+    shared: list[tuple[int, bytes]],
+    hook_body: bytes | None,
+    hook_sites: tuple[int, ...] | None,
+) -> str:
     source = add_plumbing(source)
     rendered = render(shared)
     start = source.index("PATCH = (")
@@ -135,6 +141,7 @@ def rewrite(source, shared, hook_body, hook_sites):
             'FRAME_HOOK = bytes.fromhex("")',
             updated,
         )
+    assert hook_sites is not None, "a hook body always arrives with the sites it goes to"
     updated = re.sub(
         r'FRAME_HOOK = bytes\.fromhex\("[0-9a-f]*"\)',
         f'FRAME_HOOK = bytes.fromhex("{hook_body.hex()}")',

@@ -2,6 +2,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 IMAGES = ROOT / "build" / "all"
@@ -18,7 +19,7 @@ BLOCKS = re.compile(r"^BLOCKS ok=(\d+) bad=(\d+)")
 RESULT = re.compile(r"^RESULT load=(\w+) frames=(\d+)")
 
 
-def run(image, mapping, roster, budget):
+def run(image: Path, mapping: str, roster: int, budget: int) -> str:
     LOGS.mkdir(parents=True, exist_ok=True)
     log = LOGS / f"tour-{image.stem}.txt"
     with log.open("wb") as handle:
@@ -52,12 +53,12 @@ def run(image, mapping, roster, budget):
     return log.read_text(errors="replace")
 
 
-def parse(text, roster, budget):
-    found = [
+def parse(text: str, roster: int, budget: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    found: list[dict[str, Any]] = [
         {"fighter": index, "main": set(), "nmi": set(), "bad": [], "ticks": 0}
         for index in range(roster)
     ]
-    summary = {"load": "?", "frames": 0, "ok": 0, "bad": 0}
+    summary: dict[str, Any] = {"load": "?", "frames": 0, "ok": 0, "bad": 0}
     slot = 0
     for line in text.splitlines():
         match = TICKLINE.match(line)
@@ -86,13 +87,13 @@ def parse(text, roster, budget):
     return found, summary
 
 
-def stalled(found):
+def stalled(found: list[dict[str, Any]]) -> list[int]:
     return [
         index for index, slot in enumerate(found) if len(slot["main"]) < 2 or len(slot["nmi"]) < 2
     ]
 
 
-def passed(found, summary, roster, budget):
+def passed(found: list[dict[str, Any]], summary: dict[str, Any], roster: int, budget: int) -> bool:
     return (
         not stalled(found)
         and summary["bad"] == 0
@@ -101,7 +102,7 @@ def passed(found, summary, roster, budget):
     )
 
 
-def report(name, found, summary):
+def report(name: str, found: list[dict[str, Any]], summary: dict[str, Any]) -> None:
     print(f"  {name}")
     for slot in found:
         moving = len(slot["main"]) > 1 and len(slot["nmi"]) > 1
