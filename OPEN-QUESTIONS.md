@@ -45,6 +45,23 @@ the rest of this project makes, and it is written down rather than rounded up.
 **What would settle it:** a recorded input sequence that reaches either scene,
 run before and after.
 
+## What the prototype settled, and what it did not
+
+Capcom shipped a prototype of the Japanese cartridge dated 1996-09-15. It
+declares no coprocessor and stores uncompressed a large amount of what the retail
+cartridge compresses.
+
+Decompressing every stream in the Japanese table and searching that prototype
+finds **242 matching in full, 311,264 bytes**, with no partial match counted.
+Those bytes are Capcom's own data from before the compression step, so for those
+entries the table is not merely converged, it is confirmed against the source.
+
+That is a correctness result and not a completeness one, and the two are kept
+apart deliberately. A stream missing from the table is still missing from it, and
+the prototype cannot reveal one, because it is a different build: 2,138 of the
+table's streams are absent from it and 472 share only a first sixty four bytes.
+The section above stands unchanged.
+
 ## What is closed, and why it is worth saying
 
 **The boot window does not reach the upload driver.** An earlier reading here
@@ -72,6 +89,17 @@ ports per handshake and self modifies its destinations. The two describe
 different drivers, and the changelog entry naming two bytes predates both.
 Nothing here is derived from either. The mismatch is recorded so that no later
 reader treats the published assembly as a description of the shipped binary.
+
+The same gap closes off its later work entirely. That package advertises fixes
+for a double KO hang, a freeze when facing Zangief and a black screen crash,
+dated 2021-06-14, 2021-06-21 and 2022-10-13, all after its published assembly and
+none present in it. Subtracting every address that assembly touches from the
+binary diff leaves 641 unexplained runs and 39,643 bytes, unlabelled, and the
+same diff adds 64 long calls into bank `$C7` and 39 into bank `$D2`, whose
+mapping depends on the very S-DD1 window this project removes. The three fixes
+are therefore neither identifiable nor addressable here, and no run here reaches
+a double KO to demonstrate one if they were. They are wanted and they are out of
+reach, which is a different thing from being ignored.
 
 **Neither cartridge is here, and neither is any output.** Everything published is
 a digest. That is a rule rather than a limitation, and it is the reason the

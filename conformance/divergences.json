@@ -4,7 +4,8 @@
     "siblings": "Nine members on the import path, each held to its own suite: mos65xx, sony-spc700, sony-s-smp, sony-s-dsp, snes-sdd1, snes-mapper, snes-rom-image, snes-graphics and snes-driver.",
     "cartridges": "The two retail images named in artifacts.manifest.json, each identified by four digests and neither carried here.",
     "requests": "1,661 chip requests recorded by driving the Japanese cartridge on a model, which is what the Japanese stream table was built from.",
-    "thirdParty": "Patches published by other people, treated as claims to be checked rather than as sources."
+    "thirdParty": "Patches published by other people, treated as claims to be checked rather than as sources.",
+    "prototype": "A Capcom prototype of the Japanese cartridge dated 1996-09-15, which declares no coprocessor and stores uncompressed a large amount of what the retail cartridge compresses."
   },
   "divergences": [
     {
@@ -15,8 +16,8 @@
       "documentSays": "Nothing. No document lists what a cartridge asks its decompressor for.",
       "referenceDoes": "n/a",
       "packageFollows": "recording",
-      "reasoning": "A stream nobody asks for cannot be found by asking. The table satisfies all 1,661 recorded requests and the search converged, which is the strongest statement available and is not a proof of completeness. The USA table came from a tagged image and does not have this problem, so the gap is one cartridge wide rather than general.",
-      "wouldSettleIt": "A tagged Japanese image, or a run that reaches every screen in the game and records what each one asks for.",
+      "reasoning": "A stream nobody asks for cannot be found by asking. The table satisfies all 1,661 recorded requests and the search converged, which is the strongest statement available and is not a proof of completeness. The USA table came from a tagged image and does not have this problem, so the gap is one cartridge wide rather than general. Separately, the entries the table does contain are now known to be right for a large part of it: 242 of them expand to bytes that appear verbatim in the 1996-09-15 prototype, 311,264 bytes in total, which is Capcom's own data from before the compression step. That confirms correctness and says nothing about completeness, which are different questions and are kept apart here.",
+      "wouldSettleIt": "A tagged Japanese image, or a run that reaches every screen in the game and records what each one asks for. The prototype cannot settle it: it is a different build and 2,138 of the table's streams are absent from it.",
       "namedInDocument": "The Japanese stream table cannot be proved complete"
     },
     {
@@ -66,6 +67,18 @@
       "reasoning": "This decompresses streams ahead of time, refits what is left into a map without a coprocessor, and patches code. Every claim about what a part does is made by one of the nine members it calls, each answering to its own suite. The one thing this measures directly is how many cycles a patched driver spends, and it measures that by running it on the audio unit rather than by counting from a table.",
       "wouldSettleIt": "n/a. This is a scope boundary rather than an unknown.",
       "namedInDocument": "Nothing here models hardware"
+    },
+    {
+      "id": "a-third-party-package-cannot-supply-its-later-fixes",
+      "parts": ["gamefixes"],
+      "severity": "low",
+      "status": "acknowledged",
+      "documentSays": "n/a",
+      "referenceDoes": "A widely circulated package advertises fixes for a double KO hang, a freeze when facing Zangief and a black screen crash, dated 2021-06-14, 2021-06-21 and 2022-10-13.",
+      "packageFollows": "neither",
+      "reasoning": "None of the three can be taken. Its published assembly is dated 2021-03-08, before all of them, and contains no trace of any: the fixes exist only as bytes in a binary diff. Subtracting every address that assembly does touch leaves 641 unexplained runs and 39,643 bytes, unlabelled, and the same diff introduces 64 long calls into bank $C7 and 39 into bank $D2, whose mapping depends on the S-DD1 window this project removes. So the changes are neither identifiable nor addressable here, and could not be demonstrated if they were, because no run here reaches a double KO.",
+      "wouldSettleIt": "Assembly from the author dated after 2021-06, or a reproduction of any of the three faults on a run this project can drive.",
+      "namedInDocument": "A published patch is not evidence, including about itself"
     }
   ]
 }
