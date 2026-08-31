@@ -95,7 +95,9 @@ class BuildMapTest(unittest.TestCase):
             sdd1map.build_map(blob, gfx_size=32)
 
 
-@unittest.skipUnless(TAGGED.exists() and RETAIL.exists(), "roms are not present")
+@unittest.skipUnless(
+    TAGGED.exists() and RETAIL.exists(), "roms are not present"
+)  # pragma: no cover
 class RealMapTest(unittest.TestCase):
     entries: ClassVar[Any]
     retail: ClassVar[Any]

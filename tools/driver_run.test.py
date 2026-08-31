@@ -139,7 +139,7 @@ class SpreadTest(unittest.TestCase):
         self.assertEqual(driver_run.spread(b""), b"")
 
 
-@NEEDS_A_DUMP
+@NEEDS_A_DUMP  # pragma: no cover
 class ImageTest(unittest.TestCase):
     def test_the_driver_image_is_the_block_the_processor_is_handed(self) -> None:
         image = driver_run.image_of(bytearray(USA.read_bytes()))
@@ -158,7 +158,7 @@ class ImageTest(unittest.TestCase):
         self.assertEqual(driver_run.DRIVER_BASE, spcfast.DRIVER_BASE)
 
 
-@NEEDS_A_DUMP
+@NEEDS_A_DUMP  # pragma: no cover
 class TransferTest(unittest.TestCase):
     """The patched receive loop, run rather than read."""
 
@@ -217,7 +217,7 @@ class TransferTest(unittest.TestCase):
         self.assertNotEqual(found.memory.read8(driver_run.DESTINATION + 1), 0xFF)
 
 
-@NEEDS_A_DUMP
+@NEEDS_A_DUMP  # pragma: no cover
 class StockTest(unittest.TestCase):
     """The driver before the patch, which is the thing the patch is faster than."""
 
@@ -256,8 +256,8 @@ class StockTest(unittest.TestCase):
         self.assertGreater(stock.steps, fast.steps * 3)
 
 
-@NEEDS_A_DUMP
-@NEEDS_THE_BOOT_ROM
+@NEEDS_A_DUMP  # pragma: no cover
+@NEEDS_THE_BOOT_ROM  # pragma: no cover
 class ComposedTest(unittest.TestCase):
     """The same driver on the whole audio unit, which is a second witness.
 
@@ -364,7 +364,7 @@ class ComposedTest(unittest.TestCase):
         self.assertEqual(found.streams[0], payload[0::3])
 
 
-@NEEDS_THE_BOOT_ROM
+@NEEDS_THE_BOOT_ROM  # pragma: no cover
 class ConsoleTest(unittest.TestCase):
     def build(self, payload: bytes | bytearray) -> tuple[Any, Any]:
         chip = driver_run.ssmp.Chip("s-smp")
@@ -428,8 +428,8 @@ class ConsoleTest(unittest.TestCase):
 
 
 class EntryTest(unittest.TestCase):
-    @NEEDS_A_DUMP
-    @NEEDS_THE_BOOT_ROM
+    @NEEDS_A_DUMP  # pragma: no cover
+    @NEEDS_THE_BOOT_ROM  # pragma: no cover
     def test_a_run_from_the_command_line_reports_what_it_measured(self) -> None:
         self.assertEqual(driver_run.main([str(USA)]), 0)
 

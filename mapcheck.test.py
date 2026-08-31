@@ -74,7 +74,7 @@ class ScanCostTest(unittest.TestCase):
         self.assertGreater(worst, 0)
 
 
-@unittest.skipUnless(JP_ROM.exists(), "the Japanese ROM is absent")
+@unittest.skipUnless(JP_ROM.exists(), "the Japanese ROM is absent")  # pragma: no cover
 class JapaneseMapTest(unittest.TestCase):
     entries: ClassVar[Any]
     rom: ClassVar[Any]

@@ -33,7 +33,7 @@ PATCHED = ROOT / "build" / "sfa2-usa-patched.sfc"
 TAGGED = ROOT / "roms" / "sfa2-usa-vc-sound-restored.sfc"
 
 
-@unittest.skipUnless(
+@unittest.skipUnless(  # pragma: no cover
     IMAGE.exists() and PATCHED.exists() and TAGGED.exists(),
     "the built image is not present",
 )
@@ -187,7 +187,7 @@ STAR_OCEAN_STREAMS = (
 )
 
 
-@unittest.skipUnless(STAR_OCEAN.exists(), "the star ocean build is not present")
+@unittest.skipUnless(STAR_OCEAN.exists(), "the star ocean build is not present")  # pragma: no cover
 class ReferenceBuildTest(unittest.TestCase):
     """Runs neviksti's own translation routine, from his hardware-proven build,
     through the same interpreter and address model this project uses. It is the
@@ -246,7 +246,7 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("usage", complained[0])
 
-    @unittest.skipUnless(
+    @unittest.skipUnless(  # pragma: no cover
         IMAGE.exists() and PATCHED.exists() and TAGGED.exists(),
         "the built image is not present",
     )

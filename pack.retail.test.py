@@ -32,7 +32,7 @@ function out of the coverage measurement for the same reason.
 """
 
 
-@unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
+@unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")  # pragma: no cover
 class BuildTest(unittest.TestCase):
     def _workdir(self) -> Path:
         where = Path(tempfile.mkdtemp(dir=pack.ROOT))

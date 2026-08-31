@@ -81,7 +81,9 @@ class RegisterScanTest(unittest.TestCase):
         self.assertEqual([f.register for f in found], [0x4800, 0x4804])
 
 
-@unittest.skipUnless(RETAIL.exists() and TAGGED.exists(), "roms are not present")
+@unittest.skipUnless(
+    RETAIL.exists() and TAGGED.exists(), "roms are not present"
+)  # pragma: no cover
 class RealRomTest(unittest.TestCase):
     found: ClassVar[Any]
     mask: ClassVar[Any]

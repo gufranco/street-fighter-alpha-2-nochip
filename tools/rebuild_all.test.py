@@ -33,7 +33,7 @@ class MatrixTest(unittest.TestCase):
         self.assertIn(rebuild_all.PREFIGHT_VARIANT, ("base", "spc", "sa", "both"))
 
 
-@unittest.skipUnless(RETAIL.exists(), "the retail cartridge is not present")
+@unittest.skipUnless(RETAIL.exists(), "the retail cartridge is not present")  # pragma: no cover
 class VariantTest(unittest.TestCase):
     retail: ClassVar[Any]
     variants: ClassVar[Any]

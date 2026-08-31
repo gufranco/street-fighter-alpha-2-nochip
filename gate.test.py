@@ -53,7 +53,7 @@ class ScanTest(unittest.TestCase):
         self.assertLessEqual(worst, gate.SCAN_BUDGET)
 
 
-@unittest.skipUnless(JP_ROM.exists(), "the Japanese ROM is absent")
+@unittest.skipUnless(JP_ROM.exists(), "the Japanese ROM is absent")  # pragma: no cover
 class ShippedTableTest(unittest.TestCase):
     def test_the_shipped_table_passes_every_gate(self) -> None:
         findings = gate.check("jp")

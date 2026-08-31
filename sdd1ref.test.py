@@ -82,8 +82,10 @@ class WireFormatTest(unittest.TestCase):
             ref.encode_request(b"\x00" * 16, [(16, 4)])
 
 
-@unittest.skipUnless(docker_available(), "docker is not available")
-@unittest.skipUnless(STAR_OCEAN.exists() and ALPHA2.exists(), "reference roms are not present")
+@unittest.skipUnless(docker_available(), "docker is not available")  # pragma: no cover
+@unittest.skipUnless(
+    STAR_OCEAN.exists() and ALPHA2.exists(), "reference roms are not present"
+)  # pragma: no cover
 class DifferentialTest(unittest.TestCase):
     @classmethod
     @override

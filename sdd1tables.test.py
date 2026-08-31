@@ -108,7 +108,7 @@ class BuildTest(unittest.TestCase):
             tables.build([(entry(0, 0x007890, 0, 832), 0x008000)])
 
 
-@unittest.skipUnless(TAGGED.exists(), "the tagged rom is not present")
+@unittest.skipUnless(TAGGED.exists(), "the tagged rom is not present")  # pragma: no cover
 class RealMapTest(unittest.TestCase):
     entries: ClassVar[Any]
 

@@ -74,7 +74,7 @@ class EntropyTest(unittest.TestCase):
         self.assertTrue(find.is_distinctive(blob, minimum=10))
 
 
-@unittest.skipUnless(ALPHA2.exists(), "the alpha 2 rom is not present")
+@unittest.skipUnless(ALPHA2.exists(), "the alpha 2 rom is not present")  # pragma: no cover
 class FindStreamsTest(unittest.TestCase):
     output: ClassVar[Any]
     rom: ClassVar[Any]

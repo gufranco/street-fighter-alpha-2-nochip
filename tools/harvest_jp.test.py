@@ -158,7 +158,9 @@ class MissedTest(unittest.TestCase):
 
 
 class VariantTest(unittest.TestCase):
-    @unittest.skipUnless(harvest_jp.RETAIL.exists(), "the retail cartridge is not present")
+    @unittest.skipUnless(
+        harvest_jp.RETAIL.exists(), "the retail cartridge is not present"
+    )  # pragma: no cover
     def test_the_harvest_builds_four_variants_and_none_of_them_twice(self) -> None:
         import hardware
 
@@ -167,7 +169,9 @@ class VariantTest(unittest.TestCase):
         self.assertEqual(sorted(variants), ["base", "both", "sa", "spc"])
         self.assertEqual(len(set(variants.values())), 4)
 
-    @unittest.skipUnless(harvest_jp.RETAIL.exists(), "the retail cartridge is not present")
+    @unittest.skipUnless(
+        harvest_jp.RETAIL.exists(), "the retail cartridge is not present"
+    )  # pragma: no cover
     def test_the_harvest_variants_carry_no_skip_patch(self) -> None:
         """The harvest measures what the cartridge asks for, so it patches nothing that changes that.
 

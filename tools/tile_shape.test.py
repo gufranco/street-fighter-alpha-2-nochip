@@ -123,7 +123,7 @@ class SurveyTest(unittest.TestCase):
         self.assertEqual((found.withAnyRepeat, found.noiseWithAnyRepeat), (1, 0))
 
 
-@NEEDS_A_DUMP
+@NEEDS_A_DUMP  # pragma: no cover
 class AgainstTheCartridgeTest(unittest.TestCase):
     def measured(self) -> Any:
         return tile_shape.against(USA, limit=200)
@@ -146,7 +146,7 @@ class AgainstTheCartridgeTest(unittest.TestCase):
 
 
 class EntryTest(unittest.TestCase):
-    @NEEDS_A_DUMP
+    @NEEDS_A_DUMP  # pragma: no cover
     def test_a_run_from_the_command_line_reports_what_it_measured(self) -> None:
         self.assertEqual(tile_shape.main([str(USA), "60"]), 0)
 

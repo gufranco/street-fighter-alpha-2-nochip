@@ -107,7 +107,9 @@ class AllocationTest(unittest.TestCase):
         self.assertEqual(placed[0] >> 16, 0x41)
 
 
-@unittest.skipUnless(PATCHED.exists() and TAGGED.exists(), "the patched rom is not built")
+@unittest.skipUnless(
+    PATCHED.exists() and TAGGED.exists(), "the patched rom is not built"
+)  # pragma: no cover
 class ImageTest(unittest.TestCase):
     entries: ClassVar[Any]
     result: ClassVar[Any]

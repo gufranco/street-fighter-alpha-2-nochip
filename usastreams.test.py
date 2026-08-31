@@ -67,7 +67,7 @@ class ShapeTest(unittest.TestCase):
         self.assertNotEqual(set(usastreams.STREAMS), set(jpstreams.STREAMS))
 
 
-@unittest.skipUnless(TAGGED_ROM.exists(), "the tagged ROM is not present")
+@unittest.skipUnless(TAGGED_ROM.exists(), "the tagged ROM is not present")  # pragma: no cover
 class RegenerationTest(unittest.TestCase):
     def test_the_frozen_table_matches_what_the_tags_say(self) -> None:
         entries = rombuild.load_entries(dump.read(TAGGED_ROM))

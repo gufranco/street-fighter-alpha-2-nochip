@@ -161,7 +161,9 @@ class DisassemblyTest(unittest.TestCase):
         self.assertEqual([i.text for i in listing], ["php", "rep #$30", "bra $ec97"])
 
 
-@unittest.skipUnless(USA.exists() and JP.exists(), "the retail ROMs are not present")
+@unittest.skipUnless(
+    USA.exists() and JP.exists(), "the retail ROMs are not present"
+)  # pragma: no cover
 class RetailRomTest(unittest.TestCase):
     jp: ClassVar[Any]
     usa: ClassVar[Any]
@@ -229,7 +231,9 @@ class EntryTest(unittest.TestCase):
         source.write_bytes(USA.read_bytes())
         return source, where / "out.sfc"
 
-    @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
+    @unittest.skipUnless(
+        USA.exists(), "the retail dump is supplied by the builder"
+    )  # pragma: no cover
     def test_running_it_again_on_its_own_output_reports_rather_than_raising(self) -> None:
         source, output = self._paths()
         shinakuma.main(["shinakuma.py", str(source), str(output)], say=lambda _l: None)
@@ -242,7 +246,9 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("already", " ".join(said))
 
-    @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
+    @unittest.skipUnless(
+        USA.exists(), "the retail dump is supplied by the builder"
+    )  # pragma: no cover
     def test_and_leaves_the_image_it_was_given_unchanged(self) -> None:
         source, output = self._paths()
         shinakuma.main(["shinakuma.py", str(source), str(output)], say=lambda _l: None)
@@ -260,7 +266,9 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("usage", complained[0])
 
-    @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
+    @unittest.skipUnless(
+        USA.exists(), "the retail dump is supplied by the builder"
+    )  # pragma: no cover
     def test_patching_the_source_in_place_is_refused(self) -> None:
         source, _ = self._paths()
         complained: list[Any] = []
@@ -274,7 +282,9 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("in place", complained[0])
 
-    @unittest.skipUnless(USA.exists(), "the retail dump is supplied by the builder")
+    @unittest.skipUnless(
+        USA.exists(), "the retail dump is supplied by the builder"
+    )  # pragma: no cover
     def test_a_run_writes_the_patched_image_and_says_what_it_did(self) -> None:
         source, output = self._paths()
         said: list[Any] = []
