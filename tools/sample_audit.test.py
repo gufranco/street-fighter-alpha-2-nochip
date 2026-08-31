@@ -333,5 +333,28 @@ class LoadTest(unittest.TestCase):
         self.assertEqual(len(audit.load(bytes(audit.APU_RAM))), audit.APU_RAM)
 
 
+class FaultIdentityTest(unittest.TestCase):
+    """Two findings are the same finding when they name the same defect."""
+
+    def test_two_faults_naming_the_same_defect_are_equal(self) -> None:
+        self.assertEqual(audit.Fault(1, "loop", 0x20), audit.Fault(1, "loop", 0x20))
+
+    def test_two_faults_naming_different_defects_are_not(self) -> None:
+        self.assertNotEqual(audit.Fault(1, "loop", 0x20), audit.Fault(1, "end", 0x20))
+
+    def test_a_fault_is_not_equal_to_something_that_is_not_one(self) -> None:
+        self.assertNotEqual(audit.Fault(1, "loop", 0x20), "a fault")
+
+    def test_equal_faults_collapse_into_one_entry_in_a_set(self) -> None:
+        found = {audit.Fault(1, "loop", 0x20), audit.Fault(1, "loop", 0x20)}
+
+        self.assertEqual(len(found), 1)
+
+    def test_different_faults_stay_separate_in_a_set(self) -> None:
+        found = {audit.Fault(1, "loop", 0x20), audit.Fault(2, "loop", 0x20)}
+
+        self.assertEqual(len(found), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

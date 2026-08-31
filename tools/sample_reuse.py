@@ -1,7 +1,7 @@
 import re
 import sys
 from collections import defaultdict
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -198,7 +198,11 @@ def seconds(count: int) -> float:
     return count * SPC_CYCLES_PER_BYTE / SPC_CLOCK
 
 
-def report(name: str, text: str) -> dict[str, Any]:
+def report(name: str, text: str, say: Callable[[str], None] = print) -> dict[str, Any]:
+    """What one soundwalk log says about how much of each load was already there.
+
+    The stream is a parameter so a run can be read back rather than watched.
+    """
     runs = list(loads(events(text.splitlines())))
     totals, per_load = replay(runs)
     carrying = [entry for entry in per_load if entry["bytes"]]
@@ -215,24 +219,24 @@ def report(name: str, text: str) -> dict[str, Any]:
             repeats += 1
         previous = entry
     share = 100.0 * totals["resident_bytes"] / totals["bytes"] if totals["bytes"] else 0.0
-    print(f"  {name}")
-    print(f"    engine loads {totals['loads']}, of which {len(carrying)} moved bytes")
-    print(
+    say(f"  {name}")
+    say(f"    engine loads {totals['loads']}, of which {len(carrying)} moved bytes")
+    say(
         f"    blocks {totals['blocks']}, bytes {totals['bytes']}, "
         f"{seconds(totals['bytes']):.1f} s of driver time"
     )
-    print(
+    say(
         f"    already resident: {totals['resident_bytes']} bytes, {share:.1f}%, "
         f"{seconds(totals['resident_bytes']):.1f} s"
     )
-    print(
+    say(
         f"    pre-fight sized loads (>=20000 bytes) {len(heavy)}, "
         f"fully resident {len(heavy_resident)}, "
         f"{seconds(sum(entry['bytes'] for entry in heavy_resident)):.1f} s"
     )
-    print(f"    fully resident and identical to the load before it: {repeats}")
+    say(f"    fully resident and identical to the load before it: {repeats}")
     again = base_repeats(runs)
-    print(
+    say(
         f"    base lists carrying bytes {again['loads']}, "
         f"same as the one before {again['repeats']}, of those with the same list id "
         f"{again['repeats_same_id']}, still resident {again['resident']}, "
@@ -249,7 +253,7 @@ def report(name: str, text: str) -> dict[str, Any]:
     for group in sorted(costs, key=str):
         entry = costs[group]
         free = skippable[group]
-        print(
+        say(
             f"      {group}: {entry['walks']} walks, {entry['bytes']} bytes, "
             f"{entry['bytes'] / max(entry['walks'], 1):.0f} per walk; "
             f"entirely resident on {free['spans']} of them, {free['bytes']} bytes, "
@@ -258,12 +262,13 @@ def report(name: str, text: str) -> dict[str, Any]:
     return totals
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str], say: Callable[[str], None] = print) -> int:
+    """Report on every log named, or on every one the soundwalk left behind."""
     paths = [Path(name) for name in argv[1:]]
     if not paths:
         paths = sorted((ROOT / "build" / "soundwalk").glob("grp-*.txt"))
     for path in paths:
-        report(path.stem, path.read_text(errors="replace"))
+        report(path.stem, path.read_text(errors="replace"), say)
     return 0
 
 
