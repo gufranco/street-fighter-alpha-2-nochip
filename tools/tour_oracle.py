@@ -1,7 +1,7 @@
-import importlib.util
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -14,14 +14,6 @@ sdd1 = hardware.load("sdd1")
 
 
 ROOT = Path(__file__).resolve().parent.parent
-
-
-def load(name: str) -> Any:
-    spec = importlib.util.spec_from_file_location(name, ROOT / f"{name}.py")
-    assert spec is not None and spec.loader is not None, "no loader for that path"
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 ORACLE = "build/all/jp-sa-cart.sfc"
@@ -40,10 +32,21 @@ PASSES = (
 )
 
 
-def run(name: str, extra: list[str], frames: int) -> dict[int, int]:
+def run(
+    name: str,
+    extra: list[str],
+    frames: int,
+    execute: Callable[..., Any] = subprocess.run,
+) -> dict[int, int]:
+    """Run one tour pass and read every decompression it asked for.
+
+    The reaching out is a parameter so the parsing, which is the part worth
+    testing, can be driven against a recorded log rather than a container.
+    """
     log = ROOT / "build" / "harvest" / f"tour-{name}.txt"
+    log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("wb") as handle:
-        subprocess.run(
+        execute(
             [
                 "docker",
                 "run",
@@ -89,43 +92,60 @@ def requests(lines: list[str]) -> dict[int, int]:
     return wanted
 
 
-def main() -> int:
-    rom = dump.read(RETAIL)
+def main(
+    rom: bytes | bytearray | None = None,
+    table_path: Path | None = None,
+    seen_path: Path | None = None,
+    tour: Callable[..., dict[int, int]] = run,
+    say: Callable[[str], None] = print,
+    decode: Callable[..., Any] = sdd1.decompress,
+) -> int:
+    """Widen the table with everything the tour saw the cartridge ask for.
+
+    The cartridge, both files and the tour itself are parameters, so the rule
+    that decides what to add and what to grow can be driven without a container
+    and without the ROM. An entry already held at that length is left alone; a
+    shorter one is grown; anything that does not decode is skipped.
+    """
+    rom = dump.read(RETAIL) if rom is None else rom
+    table_path = TABLE if table_path is None else table_path
+    seen_path = ROOT / "build" / "harvest" / "tour-requests.txt" if seen_path is None else seen_path
     table: dict[int, int] = {}
-    for line in TABLE.read_text().splitlines():
+    for line in table_path.read_text().splitlines():
+        if not line.strip():
+            continue
         written_source, written_length = line.split()
         table[int(written_source)] = int(written_length)
 
     seen: dict[int, int] = {}
     for name, extra, frames in PASSES:
-        wanted = run(name, extra, frames)
+        wanted = tour(name, extra, frames)
         seen.update({s: max(seen.get(s, 0), n) for s, n in wanted.items()})
-        print(f"  {name}: {len(wanted)} addresses, {len(seen)} cumulative", flush=True)
+        say(f"  {name}: {len(wanted)} addresses, {len(seen)} cumulative")
 
     added = grown = 0
     for source, length in sorted(seen.items()):
         try:
-            produced = sdd1.decompress(rom, source, length)
+            produced = decode(rom, source, length)
         except (sdd1.TruncatedStream, IndexError, ValueError):
-            print(f"    {source:#08x} does not decode, skipped", flush=True)
+            say(f"    {source:#08x} does not decode, skipped")
             continue
         if len(produced.data) != length:
             continue
         if source not in table:
             table[source] = length
             added += 1
-            print(f"    added    {source:#08x} length {length}", flush=True)
+            say(f"    added    {source:#08x} length {length}")
         elif table[source] < length:
-            print(f"    restored {source:#08x} to {length}", flush=True)
+            say(f"    restored {source:#08x} to {length}")
             table[source] = length
             grown += 1
 
-    TABLE.write_text("\n".join(f"{s} {n}" for s, n in sorted(table.items())) + "\n")
-    (ROOT / "build" / "harvest" / "tour-requests.txt").write_text(
-        "\n".join(f"{s} {n}" for s, n in sorted(seen.items())) + "\n"
-    )
-    print(
-        f"  tour evidence {len(seen)} addresses; table {len(table)} streams, {added} added, {grown} restored"
+    table_path.write_text("\n".join(f"{s} {n}" for s, n in sorted(table.items())) + "\n")
+    seen_path.write_text("\n".join(f"{s} {n}" for s, n in sorted(seen.items())) + "\n")
+    say(
+        f"  tour evidence {len(seen)} addresses; "
+        f"table {len(table)} streams, {added} added, {grown} restored"
     )
     return 0
 

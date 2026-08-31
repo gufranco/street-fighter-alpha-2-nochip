@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
@@ -121,6 +122,123 @@ class OracleTest(unittest.TestCase):
         harvest_jp = load_module("harvest_jp", ROOT / "tools" / "harvest_jp.py")
 
         self.assertEqual(tour_oracle.WINDOW_BASE, harvest_jp.WINDOW_BASE)
+
+
+class ShellOutTest(unittest.TestCase):
+    """The one step that reaches for a container, with the reaching passed in."""
+
+    def test_it_reads_back_what_the_pass_wrote_to_the_log(self) -> None:
+        line = "DMA ch=0 src=D9:104C n=832 b=18 fixed=1\n"
+
+        def _write(_command: Any, stdout: Any = None, **_rest: Any) -> Any:
+            stdout.write(line.encode())
+            return None
+
+        found = tour_oracle.run("probe", [], 10, execute=_write)
+
+        self.assertEqual(found, {0x19104C: 832})
+
+    def test_a_pass_that_logged_nothing_names_nothing(self) -> None:
+        found = tour_oracle.run("probe", [], 10, execute=lambda *_a, **_k: None)
+
+        self.assertEqual(found, {})
+
+    def test_the_pass_is_told_which_cartridge_and_how_many_frames(self) -> None:
+        asked: list[Any] = []
+
+        def _record(command: Any, **_rest: Any) -> Any:
+            asked.append(command)
+            return None
+
+        tour_oracle.run("probe", ["-e", "SFPROBE=1"], 4242, execute=_record)
+
+        self.assertIn("4242", asked[0])
+
+
+class CommandTest(unittest.TestCase):
+    """The rule that decides what the tour adds to the table."""
+
+    ROM = bytes(0x400000)
+
+    def run_with(self, seen: dict[int, int], held: dict[int, int], **rest: Any) -> dict[int, int]:
+        where = Path(tempfile.mkdtemp())
+        table_path = where / "table.txt"
+        table_path.write_text("\n".join(f"{s} {n}" for s, n in held.items()) + "\n")
+        tour_oracle.main(
+            rom=self.ROM,
+            table_path=table_path,
+            seen_path=where / "seen.txt",
+            tour=lambda *_a: seen,
+            say=lambda _l: None,
+            **rest,
+        )
+        return {
+            int(line.split()[0]): int(line.split()[1])
+            for line in table_path.read_text().splitlines()
+            if line.strip()
+        }
+
+    def test_a_stream_the_table_does_not_hold_is_added(self) -> None:
+        self.assertEqual(self.run_with({0x191000: 832}, {}), {0x191000: 832})
+
+    def test_a_stream_held_shorter_than_the_tour_saw_is_grown(self) -> None:
+        found = self.run_with({0x191000: 832}, {0x191000: 16})
+
+        self.assertEqual(found, {0x191000: 832})
+
+    def test_a_stream_already_held_at_that_length_is_left_alone(self) -> None:
+        found = self.run_with({0x191000: 832}, {0x191000: 832})
+
+        self.assertEqual(found, {0x191000: 832})
+
+    def test_a_stream_held_longer_than_the_tour_saw_is_not_shortened(self) -> None:
+        found = self.run_with({0x191000: 16}, {0x191000: 832})
+
+        self.assertEqual(found, {0x191000: 832})
+
+    def test_a_stream_that_does_not_decode_is_skipped(self) -> None:
+        def _raise(*_args: Any) -> Any:
+            raise tour_oracle.sdd1.TruncatedStream("nope")
+
+        self.assertEqual(self.run_with({0x191000: 832}, {}, decode=_raise), {})
+
+    def test_a_stream_that_decodes_short_is_skipped(self) -> None:
+        def _short(rom: Any, source: int, length: int) -> Any:
+            return tour_oracle.sdd1.decompress(rom, source, length // 2)
+
+        self.assertEqual(self.run_with({0x191000: 832}, {}, decode=_short), {})
+
+    def test_what_the_tour_saw_is_written_out_beside_the_table(self) -> None:
+        where = Path(tempfile.mkdtemp())
+        table_path = where / "table.txt"
+        table_path.write_text("")
+        seen_path = where / "seen.txt"
+
+        tour_oracle.main(
+            rom=self.ROM,
+            table_path=table_path,
+            seen_path=seen_path,
+            tour=lambda *_a: {0x191000: 832},
+            say=lambda _l: None,
+        )
+
+        self.assertEqual(seen_path.read_text().strip(), "1642496 832")
+
+    def test_the_report_counts_what_it_added(self) -> None:
+        said: list[str] = []
+        where = Path(tempfile.mkdtemp())
+        table_path = where / "table.txt"
+        table_path.write_text("")
+
+        tour_oracle.main(
+            rom=self.ROM,
+            table_path=table_path,
+            seen_path=where / "seen.txt",
+            tour=lambda *_a: {0x191000: 832},
+            say=said.append,
+        )
+
+        self.assertIn("1 added", said[-1])
 
 
 if __name__ == "__main__":
