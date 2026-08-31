@@ -162,11 +162,11 @@ def output_encoding(encoding: str | None = DISCOVER) -> Observation:
     )
 
 
-def line_endings(root: Path) -> Observation:
+def line_endings(root: Path, sample: int = SAMPLE) -> Observation:
     """Whether the checkout was rewritten to carriage returns on the way in."""
     looked = converted = 0
     for path in sorted(root.rglob("*")):
-        if looked >= SAMPLE:
+        if looked >= sample:
             break
         if not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
             continue
@@ -192,8 +192,15 @@ def line_endings(root: Path) -> Observation:
     return Observation("line endings", True, f"line feeds in {looked} sampled files", None)
 
 
-def filesystem_case(root: Path) -> Observation:
-    """Whether this filesystem tells one spelling from another, which is not a fault."""
+def filesystem_case(root: Path, insensitive: bool | None = None) -> Observation:
+    """Whether this filesystem tells one spelling from another, which is not a fault.
+
+    The answer is taken rather than probed when a caller supplies one, because a
+    machine can only be one of the two and the other branch would otherwise be
+    unreachable wherever the check happens to run.
+    """
+    if insensitive is not None:
+        return _case_verdict(insensitive)
     probe = root / ".doctor-case-probe"
     try:
         probe.write_bytes(b"")
@@ -203,6 +210,11 @@ def filesystem_case(root: Path) -> Observation:
     finally:
         with contextlib.suppress(OSError):
             probe.unlink()
+    return _case_verdict(insensitive)
+
+
+def _case_verdict(insensitive: bool) -> Observation:
+    """One reading turned into a line. Neither answer is a fault."""
     if insensitive:
         return Observation(
             "filesystem case",
@@ -339,10 +351,10 @@ def machine() -> Observation:
     )
 
 
-def locale_setting() -> Observation:
+def locale_setting(preferred: str | None = None, utf8: int | None = None) -> Observation:
     """The encoding Python reads files with when nobody names one."""
-    preferred = locale.getpreferredencoding(False)
-    utf8 = getattr(sys.flags, "utf8_mode", 0)
+    preferred = locale.getpreferredencoding(False) if preferred is None else preferred
+    utf8 = getattr(sys.flags, "utf8_mode", 0) if utf8 is None else utf8
     detail = f"{preferred}, UTF-8 mode {'on' if utf8 else 'off'}"
     if utf8 or preferred.lower().replace("-", "") == "utf8":
         return Observation("default encoding", True, detail, None)
@@ -385,9 +397,14 @@ def observations(root: Path) -> list[Observation]:
     return [guarded(name, check, root) for name, check in CHECKS]
 
 
-def lines(root: Path) -> list[str]:
-    """The same, ready to paste."""
-    found = observations(root)
+def lines(root: Path, found: list[Observation] | None = None) -> list[str]:
+    """The same, ready to paste.
+
+    The readings are taken rather than gathered when a caller supplies them, so
+    the advice a failing check prints can be exercised on a machine where every
+    check happens to pass.
+    """
+    found = observations(root) if found is None else found
     out = [f"  {'ok  ' if one.ok else '   !'}  {one.name}: {one.detail}" for one in found]
     for one in found:
         if not one.ok and one.advice:

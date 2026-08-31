@@ -126,6 +126,29 @@ class LineEndingTest(unittest.TestCase):
 
             self.assertIn("nothing", found.detail)
 
+    def test_a_sample_that_fills_up_stops_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as where:
+            for n in range(3):
+                (Path(where) / f"{n}.md").write_bytes(b"one\n")
+
+            found = environment.line_endings(Path(where), sample=1)
+
+            self.assertIn("1 sampled", found.detail)
+
+    def test_a_file_it_cannot_read_is_passed_over_rather_than_counted(self) -> None:
+        with tempfile.TemporaryDirectory() as where:
+            good = Path(where) / "a.md"
+            good.write_bytes(b"one\n")
+            bad = Path(where) / "b.md"
+            bad.write_bytes(b"two\r\n")
+            bad.chmod(0o000)
+            try:
+                found = environment.line_endings(Path(where))
+            finally:
+                bad.chmod(0o600)
+
+            self.assertTrue(found.ok)
+
 
 class CaseTest(unittest.TestCase):
     def test_a_case_sensitive_filesystem_is_reported_as_such(self) -> None:
@@ -260,6 +283,81 @@ class SpaceTest(unittest.TestCase):
         found = environment.free_space(ROOT, measure=_refuse)
 
         self.assertFalse(found.ok)
+
+    def test_a_case_insensitive_answer_is_reported_and_is_not_a_fault(self) -> None:
+        found = environment.filesystem_case(ROOT, insensitive=True)
+
+        self.assertEqual((found.ok, "insensitive" in found.detail), (True, True))
+
+    def test_a_case_sensitive_answer_is_reported_the_same_way(self) -> None:
+        found = environment.filesystem_case(ROOT, insensitive=False)
+
+        self.assertEqual((found.ok, found.detail), (True, "case sensitive"))
+
+    def test_a_root_it_cannot_write_to_is_reported_rather_than_raised(self) -> None:
+        with tempfile.TemporaryDirectory() as where:
+            Path(where).chmod(0o500)
+            try:
+                found = environment.filesystem_case(Path(where))
+            finally:
+                Path(where).chmod(0o700)
+
+            self.assertEqual((found.ok, "could not probe" in found.detail), (True, True))
+
+
+class LocaleTest(unittest.TestCase):
+    def test_utf8_mode_on_is_fine_whatever_the_locale_says(self) -> None:
+        found = environment.locale_setting(preferred="cp1252", utf8=1)
+
+        self.assertTrue(found.ok)
+
+    def test_a_utf8_locale_is_fine_with_the_mode_off(self) -> None:
+        found = environment.locale_setting(preferred="UTF-8", utf8=0)
+
+        self.assertTrue(found.ok)
+
+    def test_a_legacy_locale_with_the_mode_off_is_not(self) -> None:
+        found = environment.locale_setting(preferred="cp1252", utf8=0)
+
+        self.assertFalse(found.ok)
+
+    def test_and_the_advice_names_the_switch(self) -> None:
+        found = environment.locale_setting(preferred="cp1252", utf8=0)
+
+        self.assertIn("PYTHONUTF8", found.advice)
+
+
+class ReportTest(unittest.TestCase):
+    def test_every_observation_becomes_a_line(self) -> None:
+        found = environment.lines(ROOT)
+
+        self.assertGreaterEqual(len(found), len(environment.observations(ROOT)))
+
+    def test_a_line_says_whether_its_check_passed(self) -> None:
+        found = environment.lines(ROOT)
+
+        self.assertTrue(all(line.startswith(("  ok  ", "     !", "       ")) for line in found))
+
+    def test_advice_is_printed_under_the_checks_that_failed(self) -> None:
+        found = environment.lines(ROOT)
+        unwell = [one for one in environment.observations(ROOT) if not one.ok and one.advice]
+
+        self.assertEqual(len([x for x in found if x.startswith("         ")]), len(unwell))
+
+    def test_a_failing_check_prints_its_advice_underneath(self) -> None:
+        unwell = [environment.Observation("thing", False, "not well", "do this")]
+
+        found = environment.lines(ROOT, unwell)
+
+        self.assertEqual(found[1].strip(), "thing: do this")
+
+    def test_a_failing_check_with_no_advice_prints_only_its_line(self) -> None:
+        unwell = [environment.Observation("thing", False, "not well", None)]
+
+        self.assertEqual(len(environment.lines(ROOT, unwell)), 1)
+
+    def test_a_run_from_the_command_line_reports_what_it_found(self) -> None:
+        self.assertIn(environment.main(), (0, 1))
 
 
 class SurveyTest(unittest.TestCase):
