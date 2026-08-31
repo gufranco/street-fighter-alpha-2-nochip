@@ -1,7 +1,7 @@
+import contextlib
 import importlib.util
 import shutil
 import subprocess
-import contextlib
 import tempfile
 import unittest
 from pathlib import Path
