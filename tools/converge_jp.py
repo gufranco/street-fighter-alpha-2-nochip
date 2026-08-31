@@ -2,6 +2,7 @@ import importlib.util
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -57,30 +58,47 @@ PASSES = (
 )
 
 
-def read_table() -> dict[int, int]:
+def read_table(path: Path = TABLE) -> dict[int, int]:
     table: dict[int, int] = {}
-    for line in TABLE.read_text().splitlines():
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
         source, length = line.split()
         table[int(source)] = int(length)
     return table
 
 
-def write_table(table: dict[int, int]) -> None:
-    TABLE.write_text("\n".join(f"{s} {n}" for s, n in sorted(table.items())) + "\n")
+def write_table(table: dict[int, int], path: Path = TABLE) -> None:
+    path.write_text("\n".join(f"{s} {n}" for s, n in sorted(table.items())) + "\n")
 
 
-def build_variants(table: dict[int, int]) -> Any:
-    OUT.mkdir(parents=True, exist_ok=True)
+def variants() -> dict[str, bytes | bytearray]:
     retail = dump.read(RETAIL)
     fast = spcfast.apply(retail)
-    carts = {"base": retail, "spc": fast, "both": shinakuma.apply(fast)}
+    return {"base": retail, "spc": fast, "both": shinakuma.apply(fast)}
+
+
+def build_variants(
+    table: dict[int, int],
+    execute: Callable[..., Any] = subprocess.run,
+    carts: dict[str, bytes | bytearray] | None = None,
+) -> Any:
+    """Assemble the bypass against each cartridge variant and stamp the table in.
+
+    The shelling out is a parameter so the loop can be driven without a
+    container, and so is the variant set, so it can be driven without the ROM.
+    Deriving the variants is not tested here because each patch carries its own
+    proof that it produces what it claims.
+    """
+    OUT.mkdir(parents=True, exist_ok=True)
+    carts = variants() if carts is None else carts
     entries = rombuild.entries_from_map({str(s): n for s, n in table.items()})
     built = []
     for name, cart in carts.items():
         staged = OUT / f"jp-{name}-cart.sfc"
         staged.write_bytes(cart)
         produced_name = f"jp-{name}-converge.sfc"
-        subprocess.run(
+        execute(
             [
                 sys.executable,
                 "build.py",
@@ -102,8 +120,18 @@ def build_variants(table: dict[int, int]) -> Any:
     return built
 
 
-def requests_of(image: Path, extra: Any, frames: int) -> dict[int, int]:
-    result = subprocess.run(
+def requests_of(
+    image: Path,
+    extra: Any,
+    frames: int,
+    execute: Callable[..., Any] = subprocess.run,
+) -> dict[int, int]:
+    """Run one emulator pass and read every stream the cartridge asked for.
+
+    The reaching out is a parameter so the parsing, which is the part worth
+    testing, can be driven against a recorded log rather than a container.
+    """
+    result = execute(
         [
             "docker",
             "run",
@@ -143,39 +171,56 @@ def requests_of(image: Path, extra: Any, frames: int) -> dict[int, int]:
     return wanted
 
 
-def main() -> int:
-    retail = dump.read(RETAIL)
-    for iteration in range(1, 21):
-        table = read_table()
-        images = build_variants(table)
+def main(
+    retail: bytes | bytearray | None = None,
+    build: Callable[..., Any] = build_variants,
+    request: Callable[..., dict[int, int]] = requests_of,
+    read: Callable[[], dict[int, int]] = read_table,
+    write: Callable[[dict[int, int]], None] = write_table,
+    say: Callable[[str], None] = print,
+    decode: Callable[..., Any] = sdd1.decompress,
+    rounds: int = 20,
+) -> int:
+    """Widen the table until a round finds no stream the cartridge still wants.
+
+    Every collaborator is passed in, so the convergence rule can be driven
+    without a ROM, a container or the assembler. The rule is the part worth
+    testing: a round that adds nothing means the table is complete, and a run
+    that exhausts its rounds without that happening has not converged and says
+    so through the exit status.
+    """
+    retail = dump.read(RETAIL) if retail is None else retail
+    for iteration in range(1, rounds + 1):
+        table = read()
+        images = build(table)
         candidates: dict[int, int] = {}
         work = [(image, extra, frames) for image in images for _n, extra, frames in PASSES]
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-            for wanted in pool.map(lambda job: requests_of(*job), work):
+            for wanted in pool.map(lambda job: request(*job), work):
                 for source, length in wanted.items():
                     if source in table:
                         continue
                     candidates[source] = max(candidates.get(source, 0), length)
-        print(f"  iteration {iteration}: {len(candidates)} candidates", flush=True)
+        say(f"  iteration {iteration}: {len(candidates)} candidates")
 
         added = 0
         for source, length in sorted(candidates.items()):
             try:
-                produced = sdd1.decompress(retail, source, length)
+                produced = decode(retail, source, length)
             except (sdd1.TruncatedStream, IndexError, ValueError):
-                print(f"    {source:#08x} does not decode, skipped", flush=True)
+                say(f"    {source:#08x} does not decode, skipped")
                 continue
             if len(produced.data) != length:
-                print(f"    {source:#08x} produced {len(produced.data)}, skipped", flush=True)
+                say(f"    {source:#08x} produced {len(produced.data)}, skipped")
                 continue
             table[source] = length
             added += 1
-            print(f"    added {source:#08x} length {length}", flush=True)
+            say(f"    added {source:#08x} length {length}")
 
-        write_table(table)
-        print(f"  iteration {iteration}: {added} added, {len(table)} streams", flush=True)
+        write(table)
+        say(f"  iteration {iteration}: {added} added, {len(table)} streams")
         if added == 0:
-            print(f"  converged after {iteration} iterations with {len(table)} streams")
+            say(f"  converged after {iteration} iterations with {len(table)} streams")
             return 0
     return 1
 

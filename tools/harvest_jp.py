@@ -2,6 +2,7 @@ import importlib.util
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -54,12 +55,23 @@ def variants(retail: bytes | bytearray) -> dict[str, bytes]:
     }
 
 
-def build_image(cart: bytes | bytearray, table: dict[int, int], name: str) -> Path:
+def build_image(
+    cart: bytes | bytearray,
+    table: dict[int, int],
+    name: str,
+    execute: Callable[..., Any] = subprocess.run,
+) -> Path:
+    """One variant assembled and packed, ready to be driven.
+
+    The shelling out is passed in so a test can watch what was asked for without
+    a container being present. Everything either side of it, the staging, the
+    repack and the write, runs for real.
+    """
     OUT.mkdir(parents=True, exist_ok=True)
     staged = OUT / f"jp-{name}-cart.sfc"
     staged.write_bytes(cart)
     output = f"jp-{name}-harvest.sfc"
-    subprocess.run(
+    execute(
         [
             sys.executable,
             "build.py",
@@ -82,10 +94,11 @@ def build_image(cart: bytes | bytearray, table: dict[int, int], name: str) -> Pa
     return free
 
 
-def scan_log(image: Path) -> list[str]:
+def scan_log(image: Path, execute: Callable[..., Any] = subprocess.run) -> list[str]:
+    """What the emulator reported while driving one image, as lines."""
     log = OUT / f"{image.stem}-scan.txt"
     with log.open("wb") as handle:
-        subprocess.run(
+        execute(
             [
                 "docker",
                 "run",
@@ -157,7 +170,13 @@ def shorten_to(rom: bytes | bytearray, source: int, length: int, boundary: int) 
     return best
 
 
-def absorb(rom: bytes | bytearray, table: dict[int, int], source: int, length: int) -> bool:
+def absorb(
+    rom: bytes | bytearray,
+    table: dict[int, int],
+    source: int,
+    length: int,
+    say: Callable[[str], None] = print,
+) -> bool:
     for other in sorted(table):
         if other >= source:
             break
@@ -165,43 +184,58 @@ def absorb(rom: bytes | bytearray, table: dict[int, int], source: int, length: i
         if other < source < end:
             trimmed = shorten_to(rom, other, table[other], source)
             if trimmed is None:
-                print(f"    cannot trim {other:#08x} to end at {source:#08x}", flush=True)
+                say(f"    cannot trim {other:#08x} to end at {source:#08x}")
                 return False
-            print(f"    trimmed {other:#08x} from {table[other]} to {trimmed} bytes", flush=True)
+            say(f"    trimmed {other:#08x} from {table[other]} to {trimmed} bytes")
             table[other] = trimmed
     table[source] = max(table.get(source, 0), length)
     return True
 
 
-def main() -> dict[int, int]:
-    rom = dump.read(RETAIL)
-    table = dict(load("jpstreams").STREAMS)
-    carts = variants(rom)
+def main(
+    rom: bytes | bytearray | None = None,
+    table: dict[int, int] | None = None,
+    carts: dict[str, bytes] | None = None,
+    build: Callable[..., Path] = build_image,
+    scan: Callable[..., list[str]] = scan_log,
+    say: Callable[[str], None] = print,
+    decode: Callable[..., Any] = sdd1.decompress,
+    rounds: int = 25,
+) -> dict[int, int]:
+    """Drive every variant until a round finds nothing new.
 
-    for iteration in range(1, 25):
+    Each collaborator is passed in so the loop can be run without a cartridge or
+    a container. The convergence rule is the thing worth testing and it is pure:
+    a round that adds nothing stops, and the round cap is the backstop under it.
+    """
+    rom = dump.read(RETAIL) if rom is None else rom
+    table = dict(load("jpstreams").STREAMS) if table is None else table
+    carts = variants(rom) if carts is None else carts
+
+    for iteration in range(1, rounds + 1):
         added = 0
         for name, cart in carts.items():
-            image = build_image(cart, table, name)
-            wanted = missed_streams(scan_log(image))
+            image = build(cart, table, name)
+            wanted = missed_streams(scan(image))
             for source, length in sorted(wanted.items()):
                 if table.get(source, 0) >= length:
                     continue
                 try:
-                    produced = sdd1.decompress(rom, source, length)
+                    produced = decode(rom, source, length)
                 except (sdd1.TruncatedStream, IndexError, ValueError) as error:
-                    print(f"    {source:#08x} n={length} does not decode: {error}", flush=True)
+                    say(f"    {source:#08x} n={length} does not decode: {error}")
                     continue
                 if len(produced.data) != length:
-                    print(f"    {source:#08x} n={length} produced {len(produced.data)}", flush=True)
+                    say(f"    {source:#08x} n={length} produced {len(produced.data)}")
                     continue
-                if absorb(rom, table, source, length):
+                if absorb(rom, table, source, length, say):
                     added += 1
-                    print(f"    {name}: added {source:#08x} length {length}", flush=True)
-            print(f"  iteration {iteration} {name}: {len(wanted)} missing", flush=True)
+                    say(f"    {name}: added {source:#08x} length {length}")
+            say(f"  iteration {iteration} {name}: {len(wanted)} missing")
         if added == 0:
-            print(f"  converged after {iteration} iterations with {len(table)} streams")
+            say(f"  converged after {iteration} iterations with {len(table)} streams")
             return table
-        print(f"  iteration {iteration}: {added} added, {len(table)} streams", flush=True)
+        say(f"  iteration {iteration}: {added} added, {len(table)} streams")
     return table
 
 
