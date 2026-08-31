@@ -52,38 +52,54 @@ def batches(cases: list[Any], size: int = BATCH) -> list[list[Any]]:
     return [cases[start : start + size] for start in range(0, len(cases), size)]
 
 
-def verify(region: str) -> tuple[list[Any], list[Any]]:
+def verify(
+    region: str,
+    read: Callable[[Any], Any] | None = None,
+    compare: Callable[..., list[Any]] | None = None,
+    say: Callable[[str], None] = print,
+) -> tuple[list[Any], list[Any]]:
+    """Every stream in one region's table, compared against the C reference.
+
+    The cartridge reader and the comparison are parameters, so the batching and
+    the running count, which are what this function adds, can be driven without
+    a dump or a container.
+    """
+    read = dump.read if read is None else read
+    compare = sdd1ref.compare if compare is None else compare
     retail, cases_for = SETS[region]
-    rom = dump.read(retail)
+    rom = read(retail)
     cases: list[Any] = cases_for()
     mismatches: list[Any] = []
     checked = 0
     for chunk in batches(cases):
         checked += len(chunk)
-        mismatches.extend(sdd1ref.compare(rom, chunk))
-        print(
-            f"    {region}: {checked:5d}/{len(cases)} checked, {len(mismatches)} differing",
-            flush=True,
-        )
+        mismatches.extend(compare(rom, chunk))
+        say(f"    {region}: {checked:5d}/{len(cases)} checked, {len(mismatches)} differing")
     return cases, mismatches
 
 
-def main(argv: list[str]) -> int:
+def main(
+    argv: list[str],
+    build: Callable[[], int] = sdd1ref.build_image,
+    check: Callable[..., tuple[list[Any], list[Any]]] = verify,
+    say: Callable[..., None] = print,
+) -> int:
+    """The command line, with the container build and the comparison passed in."""
     wanted = argv[1:] or sorted(SETS)
-    if sdd1ref.build_image() != 0:
-        print("the reference image failed to build", file=sys.stderr)
+    if build() != 0:
+        say("the reference image failed to build", file=sys.stderr)
         return 1
 
     failed = False
     for region in wanted:
-        cases, mismatches = verify(region)
+        cases, mismatches = check(region)
         for offset, length, why in mismatches[:20]:
-            print(f"  MISMATCH {offset:#09x} len {length}: {why}")
+            say(f"  MISMATCH {offset:#09x} len {length}: {why}")
         if mismatches:
             failed = True
-            print(f"  {region}: {len(mismatches)} of {len(cases)} streams differ")
+            say(f"  {region}: {len(mismatches)} of {len(cases)} streams differ")
         else:
-            print(f"  {region}: all {len(cases)} streams identical to the reference")
+            say(f"  {region}: all {len(cases)} streams identical to the reference")
     return 1 if failed else 0
 
 
