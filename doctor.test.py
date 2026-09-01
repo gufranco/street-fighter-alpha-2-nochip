@@ -63,7 +63,7 @@ class ExamineTest(unittest.TestCase):
         self.assertIn("python", [one.name for one in doctor.examine()])
 
     def test_and_the_version_of_this_project(self) -> None:
-        self.assertIn("street-fighter-alpha-2-nochip", [one.name for one in doctor.examine()])
+        self.assertIn("snes-street-fighter-alpha-2-nochip", [one.name for one in doctor.examine()])
 
     def test_every_finding_carries_a_detail(self) -> None:
         for one in doctor.examine():
@@ -287,7 +287,7 @@ class ReportTest(unittest.TestCase):
         self.assertGreaterEqual(len(doctor.report(found)), len(found))
 
     def test_it_opens_with_something_that_says_what_it_is(self) -> None:
-        self.assertIn("street-fighter-alpha-2-nochip", doctor.report(doctor.examine())[0])
+        self.assertIn("snes-street-fighter-alpha-2-nochip", doctor.report(doctor.examine())[0])
 
     def test_an_unhealthy_run_says_how_many_did_not_pass(self) -> None:
         self.assertIn("1", " ".join(doctor.report([a_finding(ok=False)])))
@@ -319,7 +319,7 @@ class EntryTest(unittest.TestCase):
 
         doctor.main([], say=said.append)
 
-        self.assertIn("street-fighter-alpha-2-nochip", " ".join(said))
+        self.assertIn("snes-street-fighter-alpha-2-nochip", " ".join(said))
 
 
 if __name__ == "__main__":

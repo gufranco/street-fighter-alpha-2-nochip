@@ -49,7 +49,7 @@ ROOT = Path(__file__).resolve().parent.parent
 IMAGES = ROOT / "build" / "all"
 LOGS = ROOT / "build" / "logs"
 
-IMAGE = "street-fighter-alpha-2-nochip/sfemu:snes9x-1.63"
+IMAGE = "snes-street-fighter-alpha-2-nochip/sfemu:snes9x-1.63"
 
 ROSTER = 18
 BUDGET = 4000

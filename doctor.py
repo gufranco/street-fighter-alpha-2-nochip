@@ -45,7 +45,7 @@ identify = importlib.import_module("identify")
 
 OLDEST_PYTHON = (3, 12)
 
-PROJECT = "street-fighter-alpha-2-nochip"
+PROJECT = "snes-street-fighter-alpha-2-nochip"
 
 PART = "sdd1"
 """The coprocessor this cartridge carries, and the model a check runs against."""

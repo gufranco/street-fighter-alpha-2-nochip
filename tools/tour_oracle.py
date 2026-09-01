@@ -59,7 +59,7 @@ def run(
                 *extra,
                 "-v",
                 f"{ROOT}:/work",
-                "street-fighter-alpha-2-nochip/sfemu:snes9x-1.63",
+                "snes-street-fighter-alpha-2-nochip/sfemu:snes9x-1.63",
                 ORACLE,
                 str(frames),
                 "-1",

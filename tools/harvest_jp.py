@@ -112,7 +112,7 @@ def scan_log(image: Path, execute: Callable[..., Any] = subprocess.run) -> list[
                 "SFGRID=1",
                 "-v",
                 f"{ROOT}:/work",
-                "street-fighter-alpha-2-nochip/sfemu:snes9x-1.63",
+                "snes-street-fighter-alpha-2-nochip/sfemu:snes9x-1.63",
                 str(image.relative_to(ROOT)),
                 str(FRAMES),
                 "-2",

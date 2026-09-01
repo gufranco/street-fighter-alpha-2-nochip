@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: street-fighter-alpha-2-nochip
+title: snes-street-fighter-alpha-2-nochip
 message: >-
   If you use this work, or the measurements it publishes, please cite it.
 type: software
@@ -7,8 +7,8 @@ authors:
   - given-names: Gustavo
     family-names: Franco
     alias: gufranco
-repository-code: https://github.com/gufranco/street-fighter-alpha-2-nochip
-url: https://github.com/gufranco/street-fighter-alpha-2-nochip
+repository-code: https://github.com/gufranco/snes-street-fighter-alpha-2-nochip
+url: https://github.com/gufranco/snes-street-fighter-alpha-2-nochip
 abstract: >-
   Rebuilds Street Fighter Alpha 2 for the Super Nintendo without its S-DD1
   decompressor, expanding every compressed stream ahead of time so the cartridge

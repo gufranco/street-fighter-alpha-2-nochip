@@ -1,5 +1,5 @@
 {
-  "name": "street-fighter-alpha-2-nochip-release-tooling",
+  "name": "snes-street-fighter-alpha-2-nochip-release-tooling",
   "version": "0.0.0-managed-by-semantic-release",
   "private": true,
   "description": "Release tooling only. This project ships no artefact: the images are built from retail cartridges the user supplies.",

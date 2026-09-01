@@ -41,7 +41,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 
-ORIGIN = "https://github.com/gufranco/street-fighter-alpha-2-nochip.git"
+ORIGIN = "https://github.com/gufranco/snes-street-fighter-alpha-2-nochip.git"
 """Where a clone comes from, named so a broken tree can be told how to fix itself."""
 
 PACKAGES: dict[str, str] = {

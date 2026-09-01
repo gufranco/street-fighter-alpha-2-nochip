@@ -5,9 +5,9 @@
 **A plain ROM of Street Fighter Alpha 2 and Street Fighter Zero 2 with the decompression chip designed
 out, so it runs from any flash cartridge that can hold it.**
 
-[![ci](https://img.shields.io/github/actions/workflow/status/gufranco/street-fighter-alpha-2-nochip/ci.yml?branch=main&label=ci)](https://github.com/gufranco/street-fighter-alpha-2-nochip/actions/workflows/ci.yml)
-[![release](https://img.shields.io/github/v/release/gufranco/street-fighter-alpha-2-nochip)](https://github.com/gufranco/street-fighter-alpha-2-nochip/releases)
-[![licence](https://img.shields.io/github/license/gufranco/street-fighter-alpha-2-nochip)](LICENSE)
+[![ci](https://img.shields.io/github/actions/workflow/status/gufranco/snes-street-fighter-alpha-2-nochip/ci.yml?branch=main&label=ci)](https://github.com/gufranco/snes-street-fighter-alpha-2-nochip/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/gufranco/snes-street-fighter-alpha-2-nochip)](https://github.com/gufranco/snes-street-fighter-alpha-2-nochip/releases)
+[![licence](https://img.shields.io/github/license/gufranco/snes-street-fighter-alpha-2-nochip)](LICENSE)
 
 </div>
 
@@ -16,7 +16,7 @@ out, so it runs from any flash cartridge that can hold it.**
   <a href="#how-it-works">How it works</a> &nbsp;|&nbsp;
   <a href="#what-is-verified">Verification</a> &nbsp;|&nbsp;
   <a href="#repository-guide">Repository</a> &nbsp;|&nbsp;
-  <a href="https://github.com/gufranco/street-fighter-alpha-2-nochip/issues">Issues</a>
+  <a href="https://github.com/gufranco/snes-street-fighter-alpha-2-nochip/issues">Issues</a>
 </p>
 
 **No coprocessor** · **no mapper hardware** · **12,582,912 bytes** · both regions · pre-fight pause cut
@@ -312,8 +312,8 @@ repository, so a build needs your retail dumps and nothing else.
 ### Build
 
 ```bash
-git clone --recurse-submodules https://github.com/gufranco/street-fighter-alpha-2-nochip.git
-cd street-fighter-alpha-2-nochip
+git clone --recurse-submodules https://github.com/gufranco/snes-street-fighter-alpha-2-nochip.git
+cd snes-street-fighter-alpha-2-nochip
 # put your dumps in roms/, then:
 python3 tools/identify.py    # confirms each dump against its published digest
 python3 pack.py              # both regions into dist/, named with the version
@@ -477,7 +477,7 @@ enters a fight and returns, which is the only way to ask for a list that is alre
 ## The hardware this is checked against
 
 ```bash
-git clone --recurse-submodules https://github.com/gufranco/street-fighter-alpha-2-nochip.git
+git clone --recurse-submodules https://github.com/gufranco/snes-street-fighter-alpha-2-nochip.git
 ```
 
 The models this project measures itself against are not written here. Each is its own repository,
@@ -622,7 +622,7 @@ retail cartridges and skip cleanly without them, so a fresh clone runs the suite
   and keeping the generator is what allows the claim to be remade.
 - **Every change is validated on both regions and both cartridge forms** before it is called done.
 
-Bugs and wrong screens belong in [GitHub Issues](https://github.com/gufranco/street-fighter-alpha-2-nochip/issues). A wrong
+Bugs and wrong screens belong in [GitHub Issues](https://github.com/gufranco/snes-street-fighter-alpha-2-nochip/issues). A wrong
 screen is the most useful report this project can receive, because it is the one failure mode the checks
 here cannot find on their own. Say which image and region, and capture the frame if you can.
 

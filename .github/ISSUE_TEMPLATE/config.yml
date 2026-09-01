@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Where do I get the game?
-    url: https://github.com/gufranco/street-fighter-alpha-2-nochip#faq
+    url: https://github.com/gufranco/snes-street-fighter-alpha-2-nochip#faq
     about: Not from here, and nobody here will tell you. Dump what you own.
   - name: The decompressor model
     url: https://github.com/gufranco/snes-sdd1-python

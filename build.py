@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 ASM_DIR = ROOT / "asm"
-IMAGE = "street-fighter-alpha-2-nochip/asar:1.81"
+IMAGE = "snes-street-fighter-alpha-2-nochip/asar:1.81"
 
 
 class ToolchainMissing(Exception):

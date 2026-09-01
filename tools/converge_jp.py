@@ -144,7 +144,7 @@ def requests_of(
             *extra,
             "-v",
             f"{ROOT}:/work",
-            "street-fighter-alpha-2-nochip/sfemu:snes9x-1.63",
+            "snes-street-fighter-alpha-2-nochip/sfemu:snes9x-1.63",
             str(image.relative_to(ROOT)),
             str(frames),
             "-2",

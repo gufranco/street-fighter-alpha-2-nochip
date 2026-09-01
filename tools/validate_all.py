@@ -46,7 +46,7 @@ def run(image: Path, mapping: str, execute: Callable[..., Any] = subprocess.run)
                 "SFAPU=1",
                 "-v",
                 f"{ROOT}:/work",
-                "street-fighter-alpha-2-nochip/sfemu:snes9x-1.63",
+                "snes-street-fighter-alpha-2-nochip/sfemu:snes9x-1.63",
                 str(image.relative_to(ROOT)),
                 str(FRAMES),
                 mapping,

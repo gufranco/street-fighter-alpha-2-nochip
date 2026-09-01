@@ -15,5 +15,8 @@ validated-v3/
 emu-stock/
 __pycache__/
 .ruff_cache/
+node_modules/
 .DS_Store
 .mypy_cache/
+.coverage
+.coverage.*
