@@ -2,32 +2,14 @@
 
 # Street Fighter Alpha 2 without the S-DD1
 
-**A plain ROM of Street Fighter Alpha 2 and Street Fighter Zero 2 with the decompression chip designed
-out, so it runs from any flash cartridge that can hold it.**
+**Tooling to build Street Fighter Alpha 2 and Street Fighter Zero 2 ROMs with the decompression chip
+designed out, so they run from any flash cartridge that can hold them.**
 
 [![ci](https://img.shields.io/github/actions/workflow/status/gufranco/snes-street-fighter-alpha-2-nochip/ci.yml?branch=main&label=ci)](https://github.com/gufranco/snes-street-fighter-alpha-2-nochip/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/gufranco/snes-street-fighter-alpha-2-nochip)](https://github.com/gufranco/snes-street-fighter-alpha-2-nochip/releases)
 [![licence](https://img.shields.io/github/license/gufranco/snes-street-fighter-alpha-2-nochip)](LICENSE)
 
 </div>
-
-<p align="center">
-  <a href="#quick-start"><strong>Quick start</strong></a> &nbsp;|&nbsp;
-  <a href="#how-it-works">How it works</a> &nbsp;|&nbsp;
-  <a href="#what-is-verified">Verification</a> &nbsp;|&nbsp;
-  <a href="#repository-guide">Repository</a> &nbsp;|&nbsp;
-  <a href="https://github.com/gufranco/snes-street-fighter-alpha-2-nochip/issues">Issues</a>
-</p>
-
-**No coprocessor** · **no mapper hardware** · **12,582,912 bytes** · both regions · pre-fight pause cut
-to **0.72 s** · **623** tests · **zero** bytes of game data shipped
-
-```bash
-python3 tools/identify.py    # check your own cartridge dumps
-python3 pack.py              # both regions, into dist/
-```
-
-You supply the retail ROM. Nothing here contains game data, and nothing ever will.
 
 ---
 
@@ -45,63 +27,7 @@ The pause before every fight is a separate problem, and it was never the chip. I
 handing samples to the audio chip one byte per handshake. Rewriting the receiving loop to carry three
 bytes per handshake removes most of it.
 
-<table>
-<tr>
-<td width="50%" valign="top">
-
-### Runs on plain hardware
-
-No coprocessor and no special mapping hardware. Any flash cartridge that can load a 96 Mbit ROM will run
-it. Verified on a Game Doctor SF7 and an FXPAK Pro.
-
-</td>
-<td width="50%" valign="top">
-
-### The pause, mostly gone
-
-The longest pre-fight stall drops from 2.90 s to **0.78 s** on the USA build and from 2.60 s to
-**0.72 s** on the Japanese one.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-### Both regions
-
-Alpha 2 and Zero 2, each as a 96 Mbit chip-free image or as a 4 MB patched cartridge that keeps the
-chip but loses the pause.
-
-</td>
-<td width="50%" valign="top">
-
-### Shin Akuma, unlocked
-
-Two bytes. He has been in the retail cartridge since 1996, behind a cheat that went undocumented until
-2021.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-### Loads in snes9x
-
-The map these images use is merged into snes9x master, so a current build opens them with no patch.
-
-</td>
-<td width="50%" valign="top">
-
-### Reproducible from your own dump
-
-Pinned containers, no network during a build, and a gate that refuses to write an image whose stream
-table does not check out.
-
-</td>
-</tr>
-</table>
-
----
+You supply the retail dumps. Nothing here contains game data, and nothing ever will.
 
 ## How it works
 
@@ -244,8 +170,6 @@ chip-free image ships the finished table and moves it with one DMA. The 4 MB car
 because the largest run of filler anywhere in either retail ROM is 3,210 bytes and the table does not fit
 at any address.
 
----
-
 ## What you get
 
 `pack.py` writes the chip-free images. The other forms are built by the development tooling.
@@ -258,9 +182,12 @@ at any address.
 Both carry the faster sample upload, the Shin Akuma unlock and the corrections below. Only the chip-free
 image carries the pre-fight table.
 
+The unlock is two bytes. Shin Akuma has been in the retail cartridge since 1996, behind a cheat that
+went undocumented until 2021.
+
 ### The corrections
 
-Eleven entries, 214 bytes on the USA build and 56 on the Japanese one, in [`gamefixes.py`](gamefixes.py).
+Eleven entries, 218 bytes on the USA build and 60 on the Japanese one, in [`gamefixes.py`](gamefixes.py).
 Every entry is found by a byte signature rather than a hardcoded offset, so one table covers both
 regional ROMs, a ROM that does not match refuses the patch instead of writing into the wrong place, and
 applying it twice is a no-op.
@@ -272,8 +199,6 @@ applying it twice is a no-op.
 | Object table overflow | both | stops the live-object count exceeding the number of objects that exist when a ninth shadow frame is requested |
 | Thrown father sprite | both | three sprite records in the frame where Sagat holds Dan's father |
 | Empty call removal | both | 45 long calls to a bare `rtl` whose next byte is `rts`, rewritten to return directly |
-
----
 
 ## Quick start
 
@@ -356,8 +281,6 @@ Order matters. The sample and unlock patches apply to the retail ROM, the bypass
 re-layout because the re-layout reclaims the compressed data it reads, and the header comes last because
 it checksums the finished image. For the Japanese build, substitute `asm/sdd1-bypass-jp.asm`.
 
----
-
 ## What is verified
 
 Every change is built and run across both regions, all four patch sets and both cartridge forms, and
@@ -412,8 +335,6 @@ which is why the 4 MB form runs there, and that emulation is idle for the chip-f
 The Japanese build has only been run under emulation. It is byte-for-byte the same construction as the
 USA one and passes the same checks, but nobody has yet put it on a console.
 
----
-
 ## Known limits
 
 **The Japanese stream table cannot be proved complete.** A stream nobody asks for cannot be found. The
@@ -426,8 +347,6 @@ USA table came out of a tagged dump and does not have this problem.
 shadow frames plus a projectile collision, and the thrown father sprite sits in a scene no driver here
 reaches. Both rest on the disassembly rather than on a before and after, and the same runs prove neither
 changes anything that is reached.
-
----
 
 ## Emulator support
 
@@ -447,8 +366,6 @@ the merged change adds.
 
 The same gap likely exists in ares, Mesen2, bsnes and Mednafen. Nothing has been sent to them, because
 each would need building and running against both conversions first.
-
----
 
 ## Checking a patch that changes the audio path
 
@@ -482,8 +399,7 @@ git clone --recurse-submodules https://github.com/gufranco/snes-street-fighter-a
 
 The models this project measures itself against are not written here. Each is its own repository,
 pinned as a submodule at the root of this one under the name of the repository it is, and each is
-held to something outside itself
-rather than to its author's confidence.
+held to something outside itself rather than to its author's confidence.
 
 | model | what proves it |
 |---|---|
@@ -510,9 +426,8 @@ each, and whether the toolchain a build shells out to is reachable. It then asks
 own report and files what comes back under that model's name, so the whole chain is in one place
 rather than one layer of it.
 
-Nothing is inferred and nothing is hidden. A check that fails says what it saw, and a check that
-itself throws is reported as what it threw rather than taking the report down with it. Paste all of
-it into an issue.
+A check that fails says what it saw, and a check that itself throws is reported as what it threw
+rather than taking the report down with it. Paste all of it into an issue.
 
 ## Repository guide
 
@@ -581,8 +496,6 @@ windowed LoROM map and a large set of instruments, plus [`emu/play.cpp`](emu/pla
 for looking at the game. [`ref/`](ref/) is the pinned container holding snes9x's own `sdd1emu.cpp`,
 verified by sha256, which is the reference the Python decompressor is tested against.
 
----
-
 ## Working on this
 
 ### Running the checks
@@ -596,8 +509,8 @@ verified by sha256, which is the reference the Python decompressor is tested aga
 | Shell | `shellcheck --severity=style --shell=bash scripts/*.sh` |
 | The image matrix | `python3 tools/rebuild_all.py && python3 tools/validate_all.py` |
 
-623 tests across 37 modules, 354 beside the analysis modules and 269 beside the tools. Several need the
-retail cartridges and skip cleanly without them, so a fresh clone runs the suite green.
+1,167 tests across 41 modules, 676 beside the analysis modules and 491 beside the tools. Several need
+the retail cartridges and skip cleanly without them, so a fresh clone runs the suite green.
 
 ### Conventions
 
@@ -625,8 +538,6 @@ retail cartridges and skip cleanly without them, so a fresh clone runs the suite
 Bugs and wrong screens belong in [GitHub Issues](https://github.com/gufranco/snes-street-fighter-alpha-2-nochip/issues). A wrong
 screen is the most useful report this project can receive, because it is the one failure mode the checks
 here cannot find on their own. Say which image and region, and capture the frame if you can.
-
----
 
 ## Contributing
 
@@ -670,8 +581,6 @@ tested against, and for reviewing and merging the mapper.
 
 **Whoever found the Shin Akuma code** after 25 years, reported in January 2021.
 
----
-
 ## References
 
 - Modern Vintage Gamer, [A closer look at Street Fighter Alpha 2 on the Super Nintendo](https://www.youtube.com/watch?v=fB9GlZUYNUQ)
@@ -680,8 +589,6 @@ tested against, and for reviewing and merging the mapper.
 - [Retroware, The Curious Case of Street Fighter Alpha 2 on the SNES](https://articles.retroware.com/2021/03/08/the-curious-case-of-street-fighter-alpha-2-on-the-snes/)
 - [snes9x](https://github.com/snes9xgit/snes9x), `sdd1emu.cpp` for the compression reference and `iplrom.cpp` for the S-SMP boot ROM listing
 - [snes9x issue 1081](https://github.com/snes9xgit/snes9x/issues/1081) and [pull request 1082](https://github.com/snes9xgit/snes9x/pull/1082)
-
----
 
 ## Legal
 
