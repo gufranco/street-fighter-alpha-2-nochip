@@ -28,6 +28,7 @@ round to.
 | [snes-graphics-python](https://github.com/gufranco/snes-graphics-python) | The graphics formats: tiles, palettes, tilemaps, sprites and mode 7 | Format |
 | [snes-rom-image-python](https://github.com/gufranco/snes-rom-image-python) | The forms a cartridge image is stored and shipped in | Format |
 | [snes-driver-python](https://github.com/gufranco/snes-driver-python) | What a cartridge says to its coprocessor, read out of the cartridge's own code | Tool |
+| [dungeon-master-nochip](https://github.com/gufranco/dungeon-master-nochip) | Dungeon Master with its graphics coprocessor designed out | Tool |
 | [star-ocean-nochip-fix](https://github.com/gufranco/star-ocean-nochip-fix) | A header correction for two rebuilt images | Tool |
 | [street-fighter-alpha-2-nochip](https://github.com/gufranco/street-fighter-alpha-2-nochip) | Street Fighter Alpha 2 with its decompression chip designed out | Tool |
 

@@ -8,7 +8,7 @@ project knows more than it does, which is the failure it exists to prevent.
 So every live entry has to be findable in the prose, every closed one has to stay
 in the record rather than being deleted, and an entry that is still open has to
 name the measurement that would close it. The phrase each entry is found by is
-stored in the record rather than derived from the identifier, because a
+stored in the record rather than derived from the identifier, because an
 identifier turned into a heading by rule is a rule nobody maintains.
 """
 
