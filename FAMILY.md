@@ -5,7 +5,7 @@ style guide. It is the set of decisions that were expensive to reach, so that a
 repository starting today does not have to reach them again and a repository
 already running does not drift away from them quietly.
 
-The family is eighteen repositories. Where they differ from each other, the
+The family is twenty one repositories. Where they differ from each other, the
 difference is something the hardware forces rather than something nobody got
 round to.
 
@@ -29,6 +29,7 @@ round to.
 | [snes-rom-image-python](https://github.com/gufranco/snes-rom-image-python) | The forms a cartridge image is stored and shipped in | Format |
 | [snes-driver-python](https://github.com/gufranco/snes-driver-python) | What a cartridge says to its coprocessor, read out of the cartridge's own code | Tool |
 | [snes-dungeon-master-nochip](https://github.com/gufranco/snes-dungeon-master-nochip) | Dungeon Master with its graphics coprocessor designed out | Tool |
+| [snes-pilotwings-nochip](https://github.com/gufranco/snes-pilotwings-nochip) | Pilotwings with its mathematical coprocessor designed out | Tool |
 | [snes-star-ocean-nochip-fix](https://github.com/gufranco/snes-star-ocean-nochip-fix) | A header correction for two rebuilt images | Tool |
 | [snes-street-fighter-alpha-2-nochip](https://github.com/gufranco/snes-street-fighter-alpha-2-nochip) | Street Fighter Alpha 2 with its decompression chip designed out | Tool |
 
